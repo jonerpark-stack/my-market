@@ -179,6 +179,11 @@ async function decryptEnv(env, password){
   return JSON.parse(new TextDecoder().decode(pt));
 }
 async function loadData(password){
+  if(password === null){
+    const r0 = await fetch("data.json?t=" + Date.now(), {cache:"no-store"});
+    if(!r0.ok) throw new Error("데이터 파일이 아직 없습니다. Actions가 한 번 실행되어야 합니다.");
+    return r0.json();
+  }
   const r = await fetch("data.enc.json?t=" + Date.now(), {cache:"no-store"});
   if(!r.ok) throw new Error("데이터 파일이 아직 없습니다. Actions가 한 번 실행되어야 합니다.");
   return decryptEnv(await r.json(), password);
@@ -423,7 +428,7 @@ async function unlock(pw, remember){
   try{
     DATA = await loadData(pw);
     PASSWORD = pw;
-    if(remember) store.set("pw", pw); else store.del("pw");
+    if(pw !== null){ if(remember) store.set("pw", pw); else store.del("pw"); }
     $("#lock").classList.add("hidden"); $("#app").classList.remove("hidden");
     if(state.chip !== "all" && !DATA.channels.some(c=>c.id===state.chip)) state.chip = "all";
     render();
@@ -435,8 +440,15 @@ async function unlock(pw, remember){
 }
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
-const saved = store.get("pw", null);
-if(saved) unlock(saved, true);
+(async () => {
+  // 비밀번호 없이 운영 중이면(data.json 존재) 잠금 화면을 건너뜀
+  try{
+    const r = await fetch("data.json?t=" + Date.now(), {cache:"no-store"});
+    if(r.ok){ await unlock(null, false); return; }
+  }catch(e){}
+  const saved = store.get("pw", null);
+  if(saved) unlock(saved, true);
+})();
 </script>
 </body>
 </html>

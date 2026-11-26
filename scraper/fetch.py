@@ -24,7 +24,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
-DATA_FILE = ROOT / "docs" / "data.enc.json"
+DATA_FILE = ROOT / "docs" / "data.enc.json"   # 비밀번호 사용 시
+PLAIN_FILE = ROOT / "docs" / "data.json"      # 비밀번호 없이 사용 시
 KST = timezone(timedelta(hours=9))
 UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
 PBKDF2_ITER = 200_000
@@ -215,12 +216,12 @@ def ai_comment(post: dict, channel_name: str) -> dict | None:
 
 # ---------------------------------------------------------------- 메인
 def main():
-    password = os.environ.get("SITE_PASSWORD")
-    if not password:
-        sys.exit("SITE_PASSWORD 환경변수가 없습니다.")
+    password = os.environ.get("SITE_PASSWORD") or None
 
     state = {"posts": []}
-    if DATA_FILE.exists():
+    if not password and PLAIN_FILE.exists():
+        state = json.loads(PLAIN_FILE.read_text(encoding="utf-8"))
+    elif password and DATA_FILE.exists():
         try:
             state = decrypt(json.loads(DATA_FILE.read_text()), password)
         except Exception:
@@ -265,7 +266,12 @@ def main():
         "posts": posts,
     }
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    DATA_FILE.write_text(json.dumps(encrypt(out, password)))
+    if password:
+        DATA_FILE.write_text(json.dumps(encrypt(out, password)))
+        PLAIN_FILE.unlink(missing_ok=True)
+    else:
+        PLAIN_FILE.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+        DATA_FILE.unlink(missing_ok=True)
     print(f"[저장] 총 {len(posts)}건, 갱신 {out['updated']}")
 
 
