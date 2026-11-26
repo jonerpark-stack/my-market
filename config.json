@@ -1,0 +1,9 @@
+{
+  "channels": [
+    { "id": "miraebond", "name": "미래에셋 채권·경제", "emoji": "🏦", "source": "telegram" },
+    { "id": "ehdwl", "name": "서상영", "emoji": "🇺🇸", "source": "telegram" }
+  ],
+  "retention_days": 90,
+  "ai_days": 3,
+  "ai_max_per_run": 6
+}
