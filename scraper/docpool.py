@@ -25,10 +25,19 @@ def r2_client():
     need = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "R2_PUBLIC_URL", "REPORT_PASSWORD")
     if not all(os.environ.get(k) for k in need):
         return None
-    import boto3
-    return boto3.client("s3", endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
-                        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
-                        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"], region_name="auto")
+    import boto3, re as _re
+    acc = os.environ["R2_ACCOUNT_ID"].strip().lower()
+    acc = _re.sub(r"^https?://", "", acc).split(".r2.cloudflarestorage.com")[0].strip("/ ")
+    m = _re.search(r"[0-9a-f]{32}", acc)
+    if not m:
+        print(f"[DOC] R2_ACCOUNT_ID 형식 이상: 길이 {len(acc)}, 32자리 16진수가 아님 → 업로드 건너뜀")
+        return None
+    acc = m.group(0)
+    os.environ["R2_BUCKET"] = os.environ["R2_BUCKET"].strip().strip("/")
+    os.environ["R2_PUBLIC_URL"] = os.environ["R2_PUBLIC_URL"].strip().rstrip("/")
+    return boto3.client("s3", endpoint_url=f"https://{acc}.r2.cloudflarestorage.com",
+                        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"].strip(),
+                        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"].strip(), region_name="auto")
 
 
 def enc_key(salt: bytes) -> bytes:
@@ -56,7 +65,12 @@ def upload_pdfs(items, meta):
     from telethon.sync import TelegramClient
     from telethon.sessions import StringSession
     bucket, pub = os.environ["R2_BUCKET"], os.environ["R2_PUBLIC_URL"].rstrip("/")
-    ok = 0
+    ok = fails = 0
+    try:
+        s3.head_bucket(Bucket=bucket)
+    except Exception as e:
+        print(f"[DOC] R2 연결 확인 실패 → 업로드 건너뜀: {type(e).__name__}: {str(e)[:160]}")
+        return
     with TelegramClient(StringSession(os.environ["TG_SESSION"]), int(os.environ["TG_API_ID"]), os.environ["TG_API_HASH"]) as c:
         msgs = c.get_messages(CHANNEL, ids=[x["id"] for x in todo])
         for x, m in zip(todo, msgs):
@@ -74,6 +88,9 @@ def upload_pdfs(items, meta):
                 ok += 1
             except Exception as e:
                 print(f"[DOC] 업로드 실패 {x['id']}: {e}", file=sys.stderr)
+                fails += 1
+                if fails >= 3 and not ok:
+                    break
     print(f"[DOC] PDF 암호화 저장 {ok}/{len(todo)}건")
 
 
