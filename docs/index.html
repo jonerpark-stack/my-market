@@ -601,7 +601,7 @@ function buildMenu(){
   const homeGroups = [["dash", "대시보드", [["breadth","시장 체력"],["funds","증시 자금"]]], ["watch", "관심 종목 · 스크리너", []]]
     .concat(HOME_SECTIONS.map(([id, t, items]) => [id, t, items.map(i => [i[0], i[1]])]));
   const homeHtml2 = homeGroups.map(([id, t, items]) => items.length
-    ? `<details><summary class="l2">${esc(t)}</summary>${l3("sec:" + id, "↳ " + t + " 전체")}${items.map(([iid, nm]) => l3("item:" + id + ":" + iid, nm, !!LIVE[iid])).join("")}</details>`
+    ? `<details><summary class="l2">${esc(t)}</summary>${l3("sec:" + id, t + " 전체")}${items.map(([iid, nm]) => l3("item:" + id + ":" + iid, nm, !!LIVE[iid])).join("")}</details>`
     : `<div class="l2 go" data-act="sec:${id}">${esc(t)}</div>`).join("");
   const tg = DATA.channels.map(c => l3("ch:" + c.id, c.name)).join("");
   $("#dnav").innerHTML = `<h3>JP View 목차</h3>
