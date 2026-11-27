@@ -914,8 +914,8 @@ function drawHmap(){
     const hd = G.h > 40 && G.w > 50 ? 17 : 0;
     html += `<div style="position:absolute;left:${G.x}px;top:${G.y}px;width:${G.w}px;height:${G.h}px;border:1px solid #111;box-sizing:border-box;background:#111">`;
     if(hd) html += `<div style="height:${hd}px;font-size:11px;font-weight:700;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 4px;background:#222">${esc(G.k)} <span style="color:${hmColor(ch * 3)}">${sgnp(ch)}</span></div>`;
-    for(const c of squarify(G.ys.map(y => ({v: val(y), y})).sort((a, b) => b.v - a.v), 0, hd, G.w - 2, G.h - hd - 2)){
-      const y = c.y, hit = q && (y[1].toLowerCase().includes(q) || y[0].includes(q)), sel = hmPick === y[0];
+    for(const c of squarify(G.ys.map(y => ({v: val(y), s: y})).sort((a, b) => b.v - a.v), 0, hd, G.w - 2, G.h - hd - 2)){
+      const y = c.s, hit = q && (y[1].toLowerCase().includes(q) || y[0].includes(q)), sel = hmPick === y[0];
       const fs = Math.max(8, Math.min(16, Math.sqrt(c.w * c.h) / 5)), lab = c.w > 26 && c.h > 18;
       html += `<div data-hm="${y[0]}" style="position:absolute;left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px;box-sizing:border-box;border:${hit || sel ? "2px solid #fff" : "1px solid #111"};background:${hmColor(y[2])};overflow:hidden;color:#fff;text-align:center;display:flex;flex-direction:column;justify-content:center;line-height:1.15;cursor:pointer;${q && !hit ? "opacity:.45" : ""}">
         ${lab ? `<div style="font-size:${fs}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px">${esc(y[1])}</div>${c.h > fs * 2.4 ? `<div style="font-size:${fs * 0.85}px">${sgnp(y[2])}</div>` : ""}` : ""}</div>`;
@@ -1285,7 +1285,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795778653";
+const APP_VERSION = "1795779270";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
