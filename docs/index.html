@@ -678,6 +678,17 @@ async function unlock(pw, remember){
 }
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
+/* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
+const APP_VERSION = "1795754401";
+async function checkVersion(){
+  try{
+    const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
+    const v = (await r.json()).v;
+    if(v && v !== APP_VERSION && !location.search.includes("v=" + v)) location.replace(location.pathname + "?v=" + v);
+  }catch(e){}
+}
+checkVersion();
+document.addEventListener("visibilitychange", () => { if(!document.hidden) checkVersion(); });
 (async () => {
   // 비밀번호 화면 없이 바로 열기. (암호화 운영으로 바꾼 경우에만 잠금 화면 표시)
   $("#feed").innerHTML = `<div class="empty">불러오는 중…</div>`;
