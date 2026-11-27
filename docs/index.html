@@ -1099,7 +1099,7 @@ function fgHtml(){
     <div class="sec">── 구성 요소 <span style="color:var(--sub);font-weight:400;font-size:12px">0 공포 · 100 탐욕</span></div>
     ${g.parts.map(p => `<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px"><b style="flex:1;font-size:14px">${esc(p.name)}</b><span style="color:var(--sub);font-size:12.5px">${esc(p.val)}</span><b style="width:34px;text-align:right;color:${fgCol(p.score)}">${p.score}</b></div>
       <div style="height:6px;background:#222;border-radius:3px;margin:6px 0 4px"><div style="height:100%;width:${p.score}%;background:${fgCol(p.score)};border-radius:3px"></div></div><div class="hdesc">${esc(p.desc)}</div></div>`).join("")}
-    <div class="hdesc" style="margin:12px 0">각 요소를 최근 약 1년 분포 안의 백분위로 바꿔 평균한 값 · 25 미만 극단적 공포, 75 이상 극단적 탐욕 · 수석님 8개 지표 방식은 지표 구성을 받으면 그대로 바꿔 넣을 수 있음 · 미국 CNN 지수는 수집 서버 접속이 차단돼 미포함</div>`;
+    <div class="hdesc" style="margin:12px 0">각 요소를 최근 약 1년 분포 안의 백분위로 바꿔 평균한 값 · 25 미만 극단적 공포, 75 이상 극단적 탐욕</div>`;
 }
 let RD = null, SQ2 = null;
 async function loadRD(){ try{ const [a, b] = await Promise.all([fetch("reddit.json?t=" + Date.now(), {cache:"no-store"}), fetch("squeeze.json", {cache:"no-store"})]);
@@ -1438,7 +1438,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795784111";
+const APP_VERSION = "1795784728";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
