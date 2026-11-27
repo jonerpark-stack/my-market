@@ -72,7 +72,21 @@ details.fold:not([open]) .fa{transform:rotate(-90deg)}
 .hdesc{color:var(--sub);font-size:13px;margin-top:2px}
 .htag{font:700 10px var(--mono);padding:1px 6px;border-radius:3px;border:1px solid #333;color:var(--sub)}
 .htag.on{background:var(--ai);border-color:var(--ai);color:#0a0a0a}
-.sec{margin:18px 0 0;padding:6px 0;font:700 12px var(--mono);color:var(--sub);border-bottom:1px dashed #333;letter-spacing:.5px}
+.sec{margin:20px 0 0;padding:8px 10px;font:800 14px var(--mono);color:var(--amber);background:#1a1400;border-left:3px solid var(--amber);border-radius:0 4px 4px 0;letter-spacing:.3px}
+#drawer{position:fixed;inset:0;z-index:40;display:flex}
+#drawer .dbg{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+#drawer nav{position:relative;width:min(82vw,340px);height:100%;overflow-y:auto;background:#111;border-right:1px solid #333;padding:calc(16px + env(safe-area-inset-top)) 0 30px}
+#drawer h3{margin:0 18px 12px;font:800 17px var(--mono);color:var(--amber)}
+#drawer details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px}
+#drawer details>summary::-webkit-details-marker{display:none}
+#drawer details>summary::after{content:"▸";margin-left:auto;color:var(--sub);font-size:12px}
+#drawer details[open]>summary::after{content:"▾"}
+#drawer .l1{padding:13px 18px;font-weight:800;font-size:16px;border-top:1px solid #222}
+#drawer .l2{padding:10px 18px 10px 30px;font-weight:700;font-size:14.5px;color:#cfcfcf}
+#drawer .l3{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 18px 9px 44px;font-size:14px;color:#bdbdbd}
+#drawer .go{cursor:pointer}
+#drawer .go:active,#drawer .l3:active{background:#1d1d1d}
+#drawer .live{font:700 9px var(--mono);background:var(--ai);color:#0a0a0a;padding:0 4px;border-radius:3px;margin-left:6px}
 .card{padding:14px 0 14px;border-bottom:1px solid var(--line)}
 .card-h{display:flex;align-items:center;gap:8px;font:700 12px var(--mono);color:var(--amber);letter-spacing:.3px}
 .card-h .nm{color:var(--ink);font-family:inherit}
@@ -134,7 +148,7 @@ details.ai summary .hint{color:var(--sub)}
 <section id="app">
   <header>
     <div class="top">
-      <h1>JP View</h1>
+      <div style="display:flex;align-items:center;gap:10px"><button class="icon-btn" id="menuBtn" aria-label="목차">☰</button><h1>JP View</h1></div>
       <div class="meta">
         <span id="updated">-</span>
         <button class="icon-btn" id="refreshBtn" aria-label="새로고침">🔄</button>
@@ -170,6 +184,7 @@ details.ai summary .hint{color:var(--sub)}
   </div>
 </div>
 <div id="toast" class="hidden"></div>
+<div id="drawer" class="hidden"><div class="dbg"></div><nav id="dnav" aria-label="목차"></nav></div>
 
 <script>
 "use strict";
@@ -340,7 +355,7 @@ const LIVE = {tg: "telegram", squeeze: "sq"};
 function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
   const fold = store.get("fold", {});
-  const box = (id, t, body) => `<details class="fold" data-fold="${id}" ${fold[id] ? "" : "open"}><summary class="sec">── ${t} <span class="fa">▾</span></summary>${body}</details>`;
+  const box = (id, t, body) => `<details class="fold" id="sec-${id}" data-fold="${id}" ${fold[id] ? "" : "open"}><summary class="sec">── ${t} <span class="fa">▾</span></summary>${body}</details>`;
   const soon = `<div class="linkcard" style="display:block;color:var(--sub);font-size:13px">관심 종목 시세 · 스크리너 · DART 공시 · 관심 종목 리포트<br>→ 키 등록 후 활성화 예정</div>`;
   const rows = latest.map(p => {
     const line = p.ai && p.ai.key ? "AI› " + p.ai.key.replace(/^🔑\s*/,"") : p.text.split("\n").find(l=>l.trim()) || "";
@@ -351,13 +366,13 @@ function homeHtml(){
   }).join("");
   const item = (id, name, desc) => {
     const live = !!LIVE[id];
-    return `<div class="hitem" ${live ? `data-gotab="${LIVE[id]}" style="cursor:pointer"` : ""}>
+    return `<div class="hitem" id="h-${id}" ${live ? `data-gotab="${LIVE[id]}" style="cursor:pointer"` : ""}>
       <div style="display:flex;align-items:center;gap:8px"><span class="hname">${name}</span>
       <span class="htag ${live ? "on" : ""}">${live ? "LIVE" : "준비 중"}</span></div>
       <div class="hdesc">${desc}</div></div>${id === "tg" ? `<div style="padding-left:10px;border-left:1px solid var(--line);margin:0 0 6px 2px">${rows}</div>` : ""}`;
   };
-  const dash = `<div class="hitem"><div style="display:flex;align-items:center;gap:8px"><span class="hname">시장 체력</span><span class="htag">준비 중</span></div><div class="hdesc">52주 신고가 · 신저가 수, 상승 · 하락 종목 비율</div></div>
-    <div class="hitem"><div style="display:flex;align-items:center;gap:8px"><span class="hname">증시 자금</span><span class="htag">준비 중</span></div><div class="hdesc">고객예탁금 · 신용융자 잔고 추이</div></div>`;
+  const dash = `<div class="hitem" id="h-breadth"><div style="display:flex;align-items:center;gap:8px"><span class="hname">시장 체력</span><span class="htag">준비 중</span></div><div class="hdesc">52주 신고가 · 신저가 수, 상승 · 하락 종목 비율</div></div>
+    <div class="hitem" id="h-funds"><div style="display:flex;align-items:center;gap:8px"><span class="hname">증시 자금</span><span class="htag">준비 중</span></div><div class="hdesc">고객예탁금 · 신용융자 잔고 추이</div></div>`;
   return box("dash", "대시보드", dash) + box("watch", "관심 종목 · 스크리너", soon) +
     HOME_SECTIONS.map(([id, t, items]) => box(id, t, items.map(i => item(...i)).join(""))).join("");
 }
@@ -565,7 +580,7 @@ $("#feed").addEventListener("toggle", e => {
   const TABS = ["home", "telegram", "report"];
   document.addEventListener("touchstart", e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, {passive:true});
   document.addEventListener("touchend", e => {
-    if(!DATA || $("#app").classList.contains("hidden") || !$("#sheet").classList.contains("hidden")) return;
+    if(!DATA || $("#app").classList.contains("hidden") || !$("#sheet").classList.contains("hidden") || !$("#drawer").classList.contains("hidden")) return;
     if(e.target.closest(".chips,.photos,.sqf,input,textarea,.tabs")) return;
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     if(Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * .6 || Date.now() - st > 600) return;
@@ -581,6 +596,37 @@ $("#feed").addEventListener("toggle", e => {
       render(); scrollTo(0,0); }
   }, {passive:true});
 }
+function buildMenu(){
+  const l3 = (act, label, live) => `<button class="l3" data-act="${act}">${esc(label)}${live ? '<span class="live">LIVE</span>' : ""}</button>`;
+  const homeGroups = [["dash", "대시보드", [["breadth","시장 체력"],["funds","증시 자금"]]], ["watch", "관심 종목 · 스크리너", []]]
+    .concat(HOME_SECTIONS.map(([id, t, items]) => [id, t, items.map(i => [i[0], i[1]])]));
+  const homeHtml2 = homeGroups.map(([id, t, items]) => items.length
+    ? `<details><summary class="l2">${esc(t)}</summary>${l3("sec:" + id, "↳ " + t + " 전체")}${items.map(([iid, nm]) => l3("item:" + id + ":" + iid, nm, !!LIVE[iid])).join("")}</details>`
+    : `<div class="l2 go" data-act="sec:${id}">${esc(t)}</div>`).join("");
+  const tg = DATA.channels.map(c => l3("ch:" + c.id, c.name)).join("");
+  $("#dnav").innerHTML = `<h3>JP View 목차</h3>
+    <details open><summary class="l1">홈</summary>${homeHtml2}</details>
+    <details><summary class="l1">텔레그램 시황</summary>${tg}</details>
+    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>`;
+}
+function menu(open){ if(open) buildMenu(); $("#drawer").classList.toggle("hidden", !open); }
+$("#menuBtn").addEventListener("click", () => menu(true));
+$("#drawer").addEventListener("click", e => {
+  if(e.target.classList.contains("dbg")){ menu(false); return; }
+  const a = e.target.closest("[data-act]"); if(!a) return;
+  const [kind, x, y] = a.dataset.act.split(":");
+  menu(false);
+  if(kind === "ch"){ state.tab = "telegram"; state.chip = x; store.set("tab2","telegram"); store.set("chip2", x); render(); scrollTo(0,0); return; }
+  if(kind === "tab"){ state.tab = x; store.set("tab2", x); render(); scrollTo(0,0); return; }
+  if(y && LIVE[y] === "sq"){ state.tab = "sq"; render(); scrollTo(0,0); return; }
+  if(y && LIVE[y] === "telegram"){ state.tab = "telegram"; store.set("tab2","telegram"); render(); scrollTo(0,0); return; }
+  state.tab = "home"; store.set("tab2","home");
+  const f = store.get("fold", {}); f[x] = false; store.set("fold", f);
+  render();
+  const el = document.getElementById(y ? "h-" + y : "sec-" + x);
+  if(el){ const top = el.getBoundingClientRect().top + scrollY - (document.querySelector("header").offsetHeight + 8); scrollTo({top, behavior:"smooth"});
+    if(y){ el.style.transition = "background .6s"; el.style.background = "#1a1400"; setTimeout(() => el.style.background = "", 1400); } }
+});
 $("#feed").addEventListener("input", e => {
   if(e.target.id === "sqq"){ sqState.q = e.target.value; store.set("sq", sqState); const pos = e.target.selectionStart; render(); const el = $("#sqq"); el.focus(); el.setSelectionRange(pos, pos); }
 });
