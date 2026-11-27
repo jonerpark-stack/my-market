@@ -570,7 +570,7 @@ function watchHtml(){
       ${open ? `<div style="padding:0 0 10px 8px;border-left:2px solid var(--amber);margin-bottom:8px">${chartHtml(y[0], y)}
         ${ds.slice(0, 6).map(x => `<a data-dart="${x.rno}" href="#" style="display:block;font-size:12.5px;color:var(--ink);text-decoration:none;padding:3px 0">📄 ${x.dt.slice(4,6)}/${x.dt.slice(6)} ${esc(x.nm)}${dartSummary(x) ? ` <span style="color:var(--sub)">· ${dartSummary(x)}</span>` : ""}</a>`).join("") || `<div class="hdesc">최근 30일 주요 공시 없음</div>`}
         ${rs.slice(0, 5).map(x => `<div data-rp="${x.id}" style="font-size:12.5px;padding:3px 0;cursor:pointer">📑 ${esc(x.broker || "")} · ${esc(x.title || "")}</div>`).join("")}
-        <div style="margin:6px 0"><button class="act" data-tv="${y[0]}" style="padding:6px 10px">📊 ${tvOpen === y[0] ? "차트 닫기" : "트레이딩뷰 차트"}</button></div>
+        <div style="margin:6px 0"><button class="act" data-tv="${y[0]}" style="padding:6px 10px">📊 ${tvOpen === y[0] ? "차트 닫기" : "차트 보기"}</button></div>
         ${tvOpen === y[0] ? tvFrame(y[0]) : ""}
         <a href="https://m.stock.naver.com/domestic/stock/${y[0]}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--sub)">네이버 종목 화면 ›</a></div>` : ""}</div>`;
   }).join("");
@@ -580,16 +580,50 @@ function watchHtml(){
     ${rows || `<div class="hdesc" style="margin:8px 0">관심 종목을 추가하면 등락률 · 최근 공시 · 관련 리포트를 한 번에 봅니다.</div>`}
     <div class="hdesc" style="margin:8px 0">이 기기에 저장 · 스크리너 통과 종목은 자동 추가·강조 (✕로 빼면 다시 자동 추가 안 함)</div>${scrHtml()}`;
 }
-let tvOpen = null, tvIv = store.get("tvIv", "W");
+let tvOpen = null, tvIv = store.get("tvIv2", "w");
 function tvFrame(code){
-  const ivs = [["D", "일봉"], ["W", "주봉"], ["M", "월봉"]];
-  return `<div style="display:flex;gap:4px;margin:4px 0">${ivs.map(([v, t]) => `<button class="act" data-tviv="${v}" style="padding:4px 8px;font-size:12px;${tvIv === v ? "color:#111;background:var(--amber);border-color:var(--amber)" : ""}">${t}</button>`).join("")}</div>
-    <iframe src="https://s.tradingview.com/widgetembed/?symbol=KRX%3A${code}&interval=${tvIv}&theme=dark&style=1&locale=kr&hidesidetoolbar=1&studies=RSI%40tv-basicstudies%1FVolume%40tv-basicstudies&timezone=Asia%2FSeoul" style="width:100%;height:420px;border:0;border-radius:6px" loading="lazy" allowfullscreen></iframe>
-    <div class="hdesc" style="margin:2px 0 6px">트레이딩뷰 공개 차트(RSI·거래량) · 계정 레이아웃·유료 지표는 연동되지 않음</div>`;
+  const ivs = [["d", "일봉"], ["w", "주봉"]];
+  setTimeout(() => drawStockChart(code), 0);
+  return `<div style="display:flex;gap:4px;margin:4px 0">${ivs.map(([v, t]) => `<button class="act" data-tviv="${v}" style="padding:4px 10px;font-size:12px;${tvIv === v ? "color:#111;background:var(--amber);border-color:var(--amber)" : ""}">${t}</button>`).join("")}</div>
+    <div id="lc-main" style="height:300px"></div><div id="lc-rsi" style="height:110px;margin-top:2px"></div>
+    <div class="hdesc" style="margin:2px 0 6px">캔들·거래량 + RSI(14, 노랑)·시그널(9, 하늘) · 차트 엔진 TradingView Lightweight Charts · 시총 1,000억 이상 종목 · 하루 1회 갱신</div>`;
+}
+let lcLib = null;
+async function drawStockChart(code){
+  const box = document.getElementById("lc-main"); if(!box) return;
+  try{
+    if(!lcLib){ await loadScript("lib/lightweight-charts.standalone.production.js"); lcLib = window.LightweightCharts; }
+    const r = await fetch(`px/${code}.json`, {cache: "no-store"});
+    if(!r.ok){ box.innerHTML = `<div class="hdesc" style="padding:20px 0">차트 데이터가 아직 없습니다 (시총 1,000억 이상 종목은 수집 순서대로 채워짐).</div>`; document.getElementById("lc-rsi").style.display = "none"; return; }
+    const px = await r.json(), bars = (tvIv === "w" ? px.w : px.d) || [];
+    const t = x => `${x[0].slice(0,4)}-${x[0].slice(4,6)}-${x[0].slice(6,8)}`;
+    const up = hmGreen ? "#26a69a" : "#ef5350", dn = hmGreen ? "#ef5350" : "#26a69a";
+    const opt = {layout: {background: {color: "transparent"}, textColor: "#aaa"}, grid: {vertLines: {color: "#1d1d1d"}, horzLines: {color: "#1d1d1d"}},
+      rightPriceScale: {borderColor: "#333", minimumWidth: 64}, timeScale: {borderColor: "#333"}, handleScroll: true, handleScale: true};
+    box.innerHTML = ""; const ch = lcLib.createChart(box, Object.assign({width: box.clientWidth, height: 300}, opt));
+    const cs = ch.addCandlestickSeries({priceFormat: {type: "price", precision: 0, minMove: 1}, upColor: up, downColor: dn, borderUpColor: up, borderDownColor: dn, wickUpColor: up, wickDownColor: dn});
+    cs.setData(bars.map(x => ({time: t(x), open: x[1], high: x[2], low: x[3], close: x[4]})));
+    const vs = ch.addHistogramSeries({priceFormat: {type: "volume"}, priceScaleId: "", color: "#555"});
+    ch.priceScale("").applyOptions({scaleMargins: {top: 0.8, bottom: 0}});
+    vs.setData(bars.map(x => ({time: t(x), value: x[5], color: x[4] >= x[1] ? up + "88" : dn + "88"})));
+    const cl = bars.map(x => x[4]), rs = [], n = 14; let g = 0, l = 0;
+    for(let i = 0; i < cl.length; i++){ if(i === 0){ rs.push(null); continue; } const d = cl[i] - cl[i-1];
+      if(i <= n){ g += Math.max(d, 0); l += Math.max(-d, 0); if(i === n){ g /= n; l /= n; rs.push(l ? 100 - 100 / (1 + g / l) : 100); } else rs.push(null); continue; }
+      g = (g * (n - 1) + Math.max(d, 0)) / n; l = (l * (n - 1) + Math.max(-d, 0)) / n; rs.push(l ? 100 - 100 / (1 + g / l) : 100); }
+    const sg = rs.map((v, i) => { const w = rs.slice(i - 8, i + 1); return i < 8 || w.some(z => z == null) ? null : w.reduce((a, b) => a + b, 0) / 9; });
+    const rb = document.getElementById("lc-rsi"); rb.innerHTML = "";
+    const rc = lcLib.createChart(rb, Object.assign({width: rb.clientWidth, height: 110}, opt, {timeScale: {visible: false}}));
+    const rl = rc.addLineSeries({color: "#ffb300", lineWidth: 2, priceFormat: {type: "price", precision: 1, minMove: 0.1}}), sl = rc.addLineSeries({color: "#4fc3f7", lineWidth: 1});
+    rl.setData(bars.map((x, i) => rs[i] == null ? null : {time: t(x), value: rs[i]}).filter(Boolean));
+    sl.setData(bars.map((x, i) => sg[i] == null ? null : {time: t(x), value: sg[i]}).filter(Boolean));
+    [30, 50, 70].forEach(v => rl.createPriceLine({price: v, color: "#444", lineWidth: 1, lineStyle: 2, axisLabelVisible: false}));
+    ch.timeScale().subscribeVisibleLogicalRangeChange(rg => rg && rc.timeScale().setVisibleLogicalRange(rg));
+    ch.timeScale().fitContent();
+  }catch(e){ box.innerHTML = `<div class="hdesc" style="padding:20px 0">차트를 그리지 못했습니다 (${esc(e.message)}).</div>`; }
 }
 document.addEventListener("click", e => {
   const t = e.target.closest("[data-tv]"); if(t){ tvOpen = tvOpen === t.dataset.tv ? null : t.dataset.tv; render(); return; }
-  const v = e.target.closest("[data-tviv]"); if(v){ tvIv = v.dataset.tviv; store.set("tvIv", tvIv); render(); }
+  const v = e.target.closest("[data-tviv]"); if(v){ tvIv = v.dataset.tviv; store.set("tvIv2", tvIv); render(); }
 });
 function wsugHtml(sug){ return sug.map(y => `<div data-wadd="${y[0]}" style="display:flex;gap:8px;padding:8px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13.5px"><span style="flex:1">${esc(y[1])} <span style="color:var(--sub);font-size:11.5px">${y[0]} · ${y[4] === "K" ? "KOSPI" : "KOSDAQ"}</span></span><span style="color:var(--amber)">＋ 추가</span></div>`).join(""); }
 document.addEventListener("input", e => { if(e.target.id === "wq"){ wq = e.target.value; const q = wq.trim().toLowerCase();
@@ -1535,7 +1569,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795787763";
+const APP_VERSION = "1795788260";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});

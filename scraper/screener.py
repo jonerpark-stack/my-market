@@ -30,7 +30,7 @@ num = lambda v: None if v in (None, "", "-") else float(str(v).replace(",", ""))
 def fetch_px(code, now):
     end = now.strftime("%Y%m%d") + "2359"
     w = get(f"https://api.stock.naver.com/chart/domestic/item/{code}/week?startDateTime={(now - dt.timedelta(days=1100)).strftime('%Y%m%d')}0000&endDateTime={end}")
-    d = get(f"https://api.stock.naver.com/chart/domestic/item/{code}/day?startDateTime={(now - dt.timedelta(days=60)).strftime('%Y%m%d')}0000&endDateTime={end}")
+    d = get(f"https://api.stock.naver.com/chart/domestic/item/{code}/day?startDateTime={(now - dt.timedelta(days=370)).strftime('%Y%m%d')}0000&endDateTime={end}")
     conv = lambda xs: [[x["localDate"], x["openPrice"], x["highPrice"], x["lowPrice"], x["closePrice"], x.get("accumulatedTradingVolume") or 0] for x in (xs or []) if x.get("closePrice")]
     if not w: return None
     return {"at": now.isoformat(), "w": conv(w), "d": conv(d)}
@@ -158,6 +158,15 @@ def run():
             fin = fetch_fin(c, now)
             if fin: json.dump(fin, open(fp, "w"))
         time.sleep(0.05)
+    # 사이트 차트용 사본 (주봉 2년 · 일봉 1년)
+    os.makedirs(os.path.join(ROOT, "docs", "px"), exist_ok=True)
+    for c in uni:
+        dst = os.path.join(ROOT, "docs", "px", c + ".json")
+        if c not in todo and os.path.exists(dst): continue
+        try:
+            px = json.load(open(os.path.join(CACHE, "px", c + ".json")))
+            json.dump({"w": px["w"][-104:], "d": px.get("d", [])[-250:]}, open(dst, "w"), separators=(",", ":"))
+        except Exception: pass
     res = []
     for c in uni:
         try:
