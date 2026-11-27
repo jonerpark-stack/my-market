@@ -589,8 +589,9 @@ function dashHtml(){
   if(!KR) return `<div class="hdesc" style="margin:10px 0">불러오는 중…</div>`;
   const card = (pg, tab, inner) => `<div data-pg="${pg}" data-ptab="${tab}" style="border:1px solid var(--line);border-radius:8px;padding:9px 10px;cursor:pointer;min-width:0">${inner}</div>`;
   const idx = Object.entries(KR.idx || {}).map(([m, v]) => card("heat", "macro", `<div style="color:var(--sub);font-size:12px">${m}</div><div style="font-size:17px;font-weight:800">${esc(v.price || "-")}</div><div style="color:${fcol(+v.chg)};font-size:13px">${sgnp(+v.chg)}</div>`)).join("");
-  const g = KR.fg;
-  const fg = g ? card("fg", "macro", `<div style="display:flex;align-items:center;gap:8px"><div>${fgGauge(g.score, false)}</div><div><div style="color:var(--sub);font-size:12px">공포·탐욕</div><div style="font-size:24px;font-weight:800;color:${fgCol(g.score)}">${g.score}</div><div style="color:${fgCol(g.score)};font-size:13px">${esc(g.label)}</div></div></div>`) : "";
+  const g = KR.fg; if(!USFG) loadUSFG();
+  const one = (t, x) => x ? `<div style="display:flex;align-items:center;gap:6px;min-width:0"><div>${fgGauge(x.score, false).replace('width="150"', 'width="90"').replace('height="81"', 'height="51"')}</div><div><div style="color:var(--sub);font-size:11.5px">${t}</div><div style="font-size:21px;font-weight:800;color:${fgCol(x.score)}">${x.score}</div><div style="color:${fgCol(x.score)};font-size:12px">${esc(x.label)}</div></div></div>` : "";
+  const fg = g || USFG ? card("fg", "macro", `<div style="color:var(--sub);font-size:12px;margin-bottom:2px">공포·탐욕 지수</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">${one("🇰🇷 한국", g)}${one("🇺🇸 미국", USFG)}</div>`) : "";
   const k = (KR.idx || {}).KOSPI || {}, q = (KR.idx || {}).KOSDAQ || {};
   const br = (v, m) => { const t = (v.up || 0) + (v.dn || 0) + (v.flat || 0); if(!t) return ""; const u = v.up / t * 100;
     return `<div style="font-size:12px;color:var(--sub);margin-top:6px">${m} 상승 ${v.up} · 하락 ${v.dn}</div><div style="height:7px;border-radius:4px;background:#1e88e5;overflow:hidden;margin-top:3px"><div style="height:100%;width:${u.toFixed(1)}%;background:#e53935"></div></div>`; };
@@ -1101,18 +1102,27 @@ function fgGauge(sc, big){
     <line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#fff" stroke-width="${big ? 3 : 2}"/><circle cx="${cx}" cy="${cy}" r="${big ? 6 : 4}" fill="#fff"/></svg>`;
 }
 const fgCol = sc => sc < 25 ? "#ef5350" : sc < 45 ? "#ffa726" : sc < 55 ? "#bdbdbd" : sc < 75 ? "#9ccc65" : "#43a047";
+let USFG = null, usfgLoading = false, fgMkt = store.get("fgMkt", "kr");
+async function loadUSFG(){ if(usfgLoading) return; usfgLoading = true; try{ const r = await fetch("usfg.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ USFG = await r.json(); if(state.win === "pg" || state.tab === "home") render(); } }catch(e){} }
+document.addEventListener("click", e => { const b = e.target.closest("[data-fgm]"); if(b){ fgMkt = b.dataset.fgm; store.set("fgMkt", fgMkt); render(); } });
 function fgHtml(){
-  if(!KR){ loadKR(); return `<div class="empty">불러오는 중…</div>`; }
-  const g = KR.fg; if(!g) return `<div class="empty">지수 이력을 모으는 중입니다 (다음 갱신 후 표시).</div>`;
+  if(!USFG) loadUSFG();
+  const btn = (v, t) => `<button class="act" data-fgm="${v}" style="padding:7px 12px;${fgMkt === v ? "color:#111;background:var(--amber);border-color:var(--amber)" : ""}">${t}</button>`;
+  const head = `<div style="display:flex;gap:6px;margin-top:12px">${btn("kr", "🇰🇷 한국")}${btn("us", "🇺🇸 미국")}</div>`;
+  if(fgMkt === "us") return head + (USFG ? fgBody(USFG, `CNN 공포·탐욕 지수와 같은 7개 구성을 공개 데이터(Yahoo)로 직접 계산 · 신고가-신저가·거래량 폭·신용 스프레드는 대체 지표 사용 · 각 요소를 최근 1년 분포 안 백분위로 바꿔 평균 · ${esc(USFG.asof || "")} 미국 종가 기준 · CNN 발표치와 다를 수 있음`) : `<div class="empty">불러오는 중…</div>`);
+  if(!KR){ loadKR(); return head + `<div class="empty">불러오는 중…</div>`; }
+  return head + (KR.fg ? fgBody(KR.fg, "각 요소를 최근 약 1년 분포 안의 백분위로 바꿔 평균한 값 · 25 미만 극단적 공포, 75 이상 극단적 탐욕") : `<div class="empty">지수 이력을 모으는 중입니다.</div>`);
+}
+function fgBody(g, note){
   const hs = g.hist || [];
   return `<div style="text-align:center;margin-top:14px">${fgGauge(g.score, true)}<div style="font-size:38px;font-weight:800;color:${fgCol(g.score)};margin-top:-6px">${g.score}</div>
     <div style="font-size:16px;color:${fgCol(g.score)};font-weight:700">${esc(g.label)}</div></div>
-    ${hs.length > 5 ? `<div class="sec">── 최근 6개월 추이 <span style="color:var(--sub);font-weight:400;font-size:12px">가격 기반 4개 요소</span></div><div style="text-align:center">${spark(hs, 340, 70)}</div>
+    ${hs.length > 5 ? `<div class="sec">── 최근 6개월 추이${g === KR.fg ? ` <span style="color:var(--sub);font-weight:400;font-size:12px">가격 기반 4개 요소</span>` : ""}</div><div style="text-align:center">${spark(hs, 340, 70)}</div>
       <div class="hdesc" style="display:flex;justify-content:space-between"><span>${hs[0][0].slice(4,6)}/${hs[0][0].slice(6)}</span><span>${hs[hs.length-1][0].slice(4,6)}/${hs[hs.length-1][0].slice(6)}</span></div>` : ""}
     <div class="sec">── 구성 요소 <span style="color:var(--sub);font-weight:400;font-size:12px">0 공포 · 100 탐욕</span></div>
     ${g.parts.map(p => `<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px"><b style="flex:1;font-size:14px">${esc(p.name)}</b><span style="color:var(--sub);font-size:12.5px">${esc(p.val)}</span><b style="width:34px;text-align:right;color:${fgCol(p.score)}">${p.score}</b></div>
       <div style="height:6px;background:#222;border-radius:3px;margin:6px 0 4px"><div style="height:100%;width:${p.score}%;background:${fgCol(p.score)};border-radius:3px"></div></div><div class="hdesc">${esc(p.desc)}</div></div>`).join("")}
-    <div class="hdesc" style="margin:12px 0">각 요소를 최근 약 1년 분포 안의 백분위로 바꿔 평균한 값 · 25 미만 극단적 공포, 75 이상 극단적 탐욕</div>`;
+    <div class="hdesc" style="margin:12px 0">${note}</div>`;
 }
 let RD = null, SQ2 = null;
 async function loadRD(){ try{ const [a, b] = await Promise.all([fetch("reddit.json?t=" + Date.now(), {cache:"no-store"}), fetch("squeeze.json", {cache:"no-store"})]);
@@ -1451,7 +1461,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795785055";
+const APP_VERSION = "1795786195";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
