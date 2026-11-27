@@ -2,7 +2,7 @@
 출처: FINRA 공매도 잔고(API), FINRA Reg SHO 일별 공매도 거래량, Yahoo 일봉, ApeWisdom(Reddit 언급).
 GitHub Actions에서 fetch.py 실행 뒤 호출되며, 6시간에 한 번만 다시 계산한다.
 """
-import json, math, time, urllib.error, urllib.request
+import json, math, sys, time, urllib.error, urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -169,6 +169,47 @@ def build():
             "rows": [{k: (round(r[k], 4) if isinstance(r.get(k), float) else r.get(k)) for k in keep} for r in rows]}
 
 
+HIST_DIR = OUT.parent / "sqhist"
+N_HIST = 120
+
+
+def finra_hist(t):
+    api = "https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest"
+    h = {"Content-Type": "application/json", "Accept": "application/json"}
+    body = {"limit": 60, "compareFilters": [{"compareType": "EQUAL", "fieldName": "symbolCode", "fieldValue": t}]}
+    rows = json.loads(_get(api, json.dumps(body).encode(), h) or b"[]")
+    out = sorted({r["settlementDate"]: [r["settlementDate"], r.get("currentShortPositionQuantity") or 0,
+                                       r.get("daysToCoverQuantity")] for r in rows}.values())
+    return out[-48:]   # 최근 약 2년 (월 2회)
+
+
+def yahoo_hist(t):
+    j = json.loads(_get(f"https://query1.finance.yahoo.com/v8/finance/chart/{t}?range=2y&interval=1wk"))
+    r = j["chart"]["result"][0]
+    ts, c = r["timestamp"], r["indicators"]["quote"][0]["close"]
+    return [[datetime.fromtimestamp(a, KST).date().isoformat(), round(b, 4)] for a, b in zip(ts, c) if b]
+
+
+def build_hist(rows):
+    HIST_DIR.mkdir(exist_ok=True)
+    pick = rows[:N_HIST] + [r for r in rows[N_HIST:] if any(("급증" in x or "급등" in x) for x in r["signals"])][:30]
+    ok = 0
+    for r in pick:
+        try:
+            si = finra_hist(r["t"])
+            px = yahoo_hist(r["t"])
+            (HIST_DIR / f"{r['t']}.json").write_text(json.dumps({"t": r["t"], "si": si, "px": px}))
+            ok += 1
+        except Exception as e:
+            print(f"[SQUEEZE] 이력 실패 {r['t']}: {e}", file=sys.stderr)
+        time.sleep(.2)
+    keep = {f"{r['t']}.json" for r in pick}
+    for f in HIST_DIR.glob("*.json"):
+        if f.name not in keep:
+            f.unlink()
+    return {r["t"] for r in pick}
+
+
 def run():
     if OUT.exists():
         try:
@@ -179,6 +220,12 @@ def run():
         except Exception:
             pass
     data = build()
+    try:
+        has = build_hist(data["rows"])
+        for r in data["rows"]:
+            r["hist"] = r["t"] in has
+    except Exception as e:
+        print(f"[SQUEEZE] 이력 계산 실패: {e}", file=sys.stderr)
     OUT.write_text(json.dumps(data, ensure_ascii=False))
     print(f"[SQUEEZE] {data['count']}종목, 잔고 기준일 {data['si_date']}, 일별 {data['regsho_date']}")
 
