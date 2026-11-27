@@ -517,7 +517,7 @@ const HOME_SECTIONS = [
     ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏커버 일수 · 스퀴즈 점수"],
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
-const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1};
+const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1};
 function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
   const fold = Object.assign({macro: true, kr: true, us: true}, store.get("fold", {}));
@@ -845,9 +845,10 @@ function heatHtml(){
   const top = ss.map(x => x.mv || 0).sort((a, b) => b - a)[7] || 0;
   const idx = Object.entries(KR.idx || {}).map(([m, v]) => `<span style="margin-right:14px"><b>${m}</b> ${esc(v.price || "")} <span style="color:${fcol(+v.chg)}">${sgnp(+v.chg)}</span></span>`).join("");
   let h = `<div style="margin:12px 0 6px;font-size:13.5px">${idx}</div>
-    <div style="display:flex;gap:6px;margin:8px 0"><button class="act" data-hsort="mv" style="${heatSort === "mv" ? "color:var(--amber);border-color:var(--amber)" : ""}">시총순</button><button class="act" data-hsort="chg" style="${heatSort === "chg" ? "color:var(--amber);border-color:var(--amber)" : ""}">등락순</button>
+    <div style="display:flex;gap:6px;margin:8px 0"><button class="act" data-hsort="mv" style="${heatSort === "mv" ? "color:var(--amber);border-color:var(--amber)" : ""}">시총순</button><button class="act" data-hsort="chg" style="${heatSort === "chg" ? "color:var(--amber);border-color:var(--amber)" : ""}">등락순</button><button class="act" data-hsort="rs" style="${heatSort === "rs" ? "color:var(--amber);border-color:var(--amber)" : ""}">상대강도</button>
     <span class="hdesc" style="margin-left:auto;align-self:center">${esc((KR.generated || "").slice(11, 16))} 기준</span></div>
     <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px">`;
+  if(heatSort === "rs") return h.replace(/<div style="display:grid;grid-template-columns:repeat\(4[^>]*>$/, "") + rsHtml(ss);
   for(const x of ss){
     const big = heatSort === "mv" && (x.mv || 0) >= top && top > 0;
     h += `<div data-heat="${x.no}" style="grid-column:span ${big ? 2 : 1};background:${kcol(x.chg)};border-radius:4px;padding:${big ? "12px 8px" : "8px 5px"};cursor:pointer;min-height:${big ? 62 : 48}px;${heatSel === x.no ? "outline:2px solid var(--amber)" : ""}">
@@ -859,14 +860,59 @@ function heatHtml(){
   }
   return h + `</div><div class="hdesc" style="margin:10px 0">빨강 상승 · 파랑 하락, 진할수록 등락폭 큼(±4% 이상 최대) · 칸을 누르면 시총 상위 종목 · 네이버 업종 분류 기준</div>`;
 }
+function vbars(rows){
+  const mx = Math.max(1, ...rows.map(r => Math.abs(r[1] || 0))), H = 70;
+  return `<div style="display:grid;grid-template-columns:repeat(${rows.length},1fr);gap:8px;text-align:center;font-size:12.5px;margin-top:6px">${rows.map(([k, x]) => {
+    const h = Math.max(2, Math.abs(x || 0) / mx * H), up = (x || 0) >= 0;
+    return `<div><div style="color:${fcol(x)};font-weight:700;height:18px">${up ? eok(x) : ""}</div>
+      <div style="height:${H}px;display:flex;align-items:flex-end;justify-content:center">${up ? `<div style="width:60%;height:${h}px;background:#e53935;border-radius:4px 4px 0 0"></div>` : ""}</div>
+      <div style="border-top:1px solid #555;height:${H}px;display:flex;align-items:flex-start;justify-content:center">${!up ? `<div style="width:60%;height:${h}px;background:#1e88e5;border-radius:0 0 4px 4px"></div>` : ""}</div>
+      <div style="color:${fcol(x)};font-weight:700;height:18px">${!up ? eok(x) : ""}</div><div style="color:var(--sub);margin-top:2px">${k}</div></div>`; }).join("")}</div>`;
+}
+function spark(hist, w = 120, h = 34){
+  const v = hist.map(x => x[1]).filter(x => x != null); if(v.length < 2) return "";
+  const lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1;
+  const pts = v.map((y, i) => `${(i / (v.length - 1) * w).toFixed(1)},${(h - 2 - (y - lo) / r * (h - 4)).toFixed(1)}`).join(" ");
+  const c = v[v.length - 1] >= v[0] ? "#f87171" : "#60a5fa";
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.6"/></svg>`;
+}
+let RT = null;
+async function loadRT(){ try{ const r = await fetch("rates.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ RT = await r.json(); if(state.win === "pg") render(); } }catch(e){} }
+function ratesHtml(){
+  if(!RT){ loadRT(); return `<div class="empty">불러오는 중…</div>`; }
+  const row = x => { const bond = x.cat === "bond";
+    const ch = bond ? (x.chg == null ? "" : (x.chg > 0 ? "+" : "") + (x.chg * 100).toFixed(1) + "bp") : (x.pct == null ? "" : sgnp(x.pct));
+    const pr = x.price == null ? "-" : bond ? x.price.toFixed(3) + "%" : x.price.toLocaleString("ko-KR", {maximumFractionDigits: 2});
+    return `<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:1"><div style="font-size:14px">${esc(x.name)}</div>
+      <div style="font-size:15.5px;font-weight:700;margin-top:2px">${pr} <span style="font-size:12.5px;color:${fcol(x.chg)}">${ch}</span></div></div>${spark(x.hist || [])}</div>`; };
+  const its = RT.items || [];
+  return `<div class="sec" style="margin-top:14px">── 금리</div>${its.filter(x => x.cat === "bond").map(row).join("")}
+    <div class="sec">── 금리차</div>${(RT.spreads || []).map(x => `<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:1"><div style="font-size:14px">${esc(x.name)}</div>
+      <div style="font-size:15.5px;font-weight:700;margin-top:2px;color:${x.bp < 0 ? "#60a5fa" : "var(--ink)"}">${x.bp > 0 ? "+" : ""}${x.bp}bp${x.bp < 0 ? " <span style='font-size:12px'>역전</span>" : ""}</div></div>${spark(x.hist || [])}</div>`).join("")}
+    <div class="sec">── 환율</div>${its.filter(x => x.cat === "exchange").map(row).join("")}
+    <div class="hdesc" style="margin:12px 0">그래프는 최근 약 3개월 일별 종가 · 금리 변화는 bp(0.01%p) · 환율은 하나은행 고시, 달러인덱스는 Yahoo · ${esc((RT.generated || "").slice(5, 16).replace("T", " "))} 기준</div>`;
+}
+function rsHtml(ss){
+  const b = +((KR.idx || {}).KOSPI || {}).chg; if(isNaN(b)) return `<div class="empty">지수 데이터가 없습니다.</div>`;
+  const rs = ss.filter(x => x.chg != null).map(x => [x, x.chg - b]).sort((a, c) => c[1] - a[1]);
+  const mx = Math.max(0.1, ...rs.map(r => Math.abs(r[1])));
+  const bar = ([x, d]) => `<div data-heat="${x.no}" style="display:grid;grid-template-columns:38% 1fr 1fr 62px;align-items:center;gap:0;padding:5px 0;font-size:13px;cursor:pointer">
+    <span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(x.name)}</span>
+    <span style="display:flex;justify-content:flex-end;border-right:1px solid #666;height:16px">${d < 0 ? `<span style="width:${Math.abs(d) / mx * 100}%;background:#1e88e5;border-radius:3px 0 0 3px"></span>` : ""}</span>
+    <span style="display:flex;height:16px">${d >= 0 ? `<span style="width:${d / mx * 100}%;background:#e53935;border-radius:0 3px 3px 0"></span>` : ""}</span>
+    <span style="text-align:right;color:${fcol(d)}">${d > 0 ? "+" : ""}${d.toFixed(2)}%p</span></div>`;
+  const show = rs.length > 20 ? [...rs.slice(0, 10), null, ...rs.slice(-10)] : rs;
+  return `<div class="hdesc" style="margin:6px 0">KOSPI(${sgnp(b)}) 대비 초과 등락률 · 상위 10 / 하위 10</div>` +
+    show.map(r => r ? bar(r) : `<div style="text-align:center;color:var(--sub);font-size:12px;padding:4px 0">⋯ ${rs.length - 20}개 업종 ⋯</div>`).join("") +
+    `<div class="hdesc" style="margin:10px 0">당일 기준 · 업종에는 KOSDAQ 종목도 포함 · 누르면 등락순 히트맵에서 해당 업종</div>`;
+}
 function flowHtml(){
   if(!KR){ loadKR(); return `<div class="empty">불러오는 중…</div>`; }
   let h = "";
   for(const [m, v] of Object.entries(KR.idx || {})){
     const tot = (v.up || 0) + (v.dn || 0) + (v.flat || 0), ur = tot ? (v.up / tot * 100) : 0;
     h += `<div class="sec" style="margin-top:14px">── ${m} <span style="color:var(--sub);font-weight:400">${esc(v.price || "")}</span> <span style="color:${fcol(+v.chg)}">${sgnp(+v.chg)}</span></div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:13px">
-      ${[["개인", v.ind], ["외국인", v.frg], ["기관", v.ins], ["프로그램", v.prog]].map(([k, x]) => `<div style="border:1px solid var(--line);border-radius:6px;padding:8px 2px"><div style="color:var(--sub);font-size:11.5px">${k}</div><div style="color:${fcol(x)};font-weight:700;margin-top:3px">${eok(x)}</div></div>`).join("")}</div>
+      ${vbars([["개인", v.ind], ["외국인", v.frg], ["기관", v.ins], ["프로그램", v.prog]])}
       <div style="margin:10px 0 4px;font-size:12.5px;color:var(--sub)">상승 ${v.up ?? "-"}${v.upper ? ` (상한 ${v.upper})` : ""} · 하락 ${v.dn ?? "-"}${v.lower ? ` (하한 ${v.lower})` : ""} · 보합 ${v.flat ?? "-"}</div>
       <div style="height:8px;border-radius:4px;background:#1e88e5;overflow:hidden"><div style="height:100%;width:${ur.toFixed(1)}%;background:#e53935"></div></div>`;
     const hs = (KR.hist || {})[m] || [];
@@ -876,10 +922,11 @@ function flowHtml(){
   return h + `<div class="hdesc" style="margin:12px 0">단위 억원 · 장중에는 잠정치 · 일별 기록은 오늘부터 쌓입니다 · 출처 네이버페이 증권</div>`;
 }
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-heat]"); if(t){ const n = +t.dataset.heat; heatSel = heatSel === n ? null : n; const y = $("#winbody").scrollTop; render(); $("#winbody").scrollTop = y; return; }
+  const t = e.target.closest("[data-heat]"); if(t){ const n = +t.dataset.heat; if(heatSort === "rs") heatSort = "chg"; heatSel = heatSel === n ? null : n; const y = $("#winbody").scrollTop; render(); $("#winbody").scrollTop = y; return; }
   const so = e.target.closest("[data-hsort]"); if(so){ heatSort = so.dataset.hsort; heatSel = null; render(); }
 });
 function pageHtml(){
+  if(pgId === "rates"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + ratesHtml(); }
   if(pgId === "heat" || pgId === "flow"){ const w = WHEN[pgId] || [];
     return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + (pgId === "heat" ? heatHtml() : flowHtml()); }
   if(["insider","buyback","dilute","earn"].includes(pgId)){ const w = WHEN[pgId] || [];
@@ -1198,7 +1245,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795777600";
+const APP_VERSION = "1795777898";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
