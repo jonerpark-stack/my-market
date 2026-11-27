@@ -10,6 +10,7 @@ OUT = Path(__file__).resolve().parent.parent / "docs" / "reports.json"
 KST = timezone(timedelta(hours=9))
 CHANNEL = "DOC_POOL"
 KEEP_DAYS = 92
+R2_KEEP_DAYS = 180
 FIRST_LIMIT = 400
 SECTORS = ["반도체", "IT하드웨어·디스플레이", "2차전지", "자동차·부품", "조선·기계", "방산·우주", "전력·에너지·유틸리티",
            "건설·건자재", "화학·정유", "철강·소재", "금융·보험", "인터넷·게임·소프트웨어", "미디어·엔터", "통신",
@@ -103,7 +104,9 @@ def r2_cleanup(keep_ids):
         resp = s3.list_objects_v2(Bucket=bucket, Prefix="reports/")
         for o in resp.get("Contents", []):
             rid = o["Key"].split("/")[-1].split(".")[0]
-            if rid.isdigit() and int(rid) not in keep_ids:
+            # 저장한 리포트를 위해 목록에서 빠져도 파일은 R2_KEEP_DAYS까지 유지
+            old = (datetime.now(timezone.utc) - o["LastModified"]).days > R2_KEEP_DAYS
+            if rid.isdigit() and int(rid) not in keep_ids and old:
                 s3.delete_object(Bucket=bucket, Key=o["Key"])
     except Exception as e:
         print(f"[DOC] 정리 실패: {e}", file=sys.stderr)

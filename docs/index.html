@@ -348,8 +348,17 @@ function cardHtml(p){
 }
 let RP = null, rpSector = store.get("rpSector", ""), rpOpen = false;
 const rpRead = new Set(store.get("rpRead", [])), rpSaved = new Set(store.get("rpSaved", []));
+/* 저장한 리포트는 기기에 사본을 남겨 보관기간이 지나도 유지, 저장 해제하면 삭제 */
+const svItems = store.get("svItems", {});
+function svPut(k, x){ svItems[k] = Object.assign({}, x, {savedAt: svItems[k] && svItems[k].savedAt || Date.now()}); store.set("svItems", svItems); }
+function svDel(k){ delete svItems[k]; store.set("svItems", svItems); }
+function svSync(){ let ch = false;
+  if(RP) for(const x of RP.items || []) if(rpSaved.has(x.id)){ const k = "k:" + x.id; if(JSON.stringify(Object.assign({}, svItems[k], {savedAt:0})) !== JSON.stringify(Object.assign({}, x, {savedAt:0}))){ svItems[k] = Object.assign({}, x, {savedAt: svItems[k] && svItems[k].savedAt || Date.now()}); ch = true; } }
+  for(const id of rpSaved) if(!svItems["k:" + id] && RP){ rpSaved.delete(id); ch = true; }
+  if(ch){ store.set("svItems", svItems); store.set("rpSaved", [...rpSaved]); } }
 async function loadRP(){
   try{ const r = await fetch("reports.json?t=" + Date.now(), {cache:"no-store"}); RP = r.ok ? await r.json() : {items:[]}; }catch(e){ RP = {items:[]}; }
+  svSync();
   if(state.tab === "report") render();
 }
 function rpItem(x){
@@ -373,8 +382,7 @@ function krHtml(){
   const list = rpSector ? items.filter(x => (x.sector || "기타") === rpSector) : [];
   return `<div style="margin-top:12px"><button class="rpsel" data-rpsel="1"><span style="${rpSector ? "color:var(--amber)" : ""}">${rpSector ? esc(rpSector) : "‑ 선택 ‑"}</span><span>${rpOpen ? "▴" : "▾"}</span></button>
     ${rpOpen ? `<div class="rplist">${secs.map(k => `<div class="rpopt" data-rpsec="${esc(k)}"><span>${esc(k)}</span><span style="color:${unread[k] ? "var(--amber)" : "var(--sub)"}">${unread[k] ? "새 " + unread[k] : "✓"} · ${cnt[k]}</span></div>`).join("")}</div>` : ""}</div>
-    ${saved.length ? `<div class="rpsub">★ 저장한 리포트 (${saved.length})</div>${saved.map(rpItem).join("")}` : ""}
-    ${rpSector ? `<div class="rpsub">${esc(rpSector)} · ${list.length}건</div>${list.map(rpItem).join("")}` : `<div class="hdesc" style="margin:12px 0">섹터를 선택하면 리포트가 나옵니다. 누르면 텔레그램에서 PDF가 열립니다.</div>`}`;
+    ${rpSector ? `<div class="rpsub">${esc(rpSector)} · ${list.length}건</div>${list.map(rpItem).join("")}` : `<div class="hdesc" style="margin:12px 0">섹터를 선택하면 리포트가 나옵니다. 누르면 PDF가 열립니다.</div>`}`;
 }
 /* ---------- 사이트 안 PDF 뷰어 (암호화된 파일을 기기 안에서 복호화) ---------- */
 let pdfKey = null, pdfLib = null, pdfToken = 0;
@@ -450,9 +458,17 @@ function foreignHtml(){
       <div style="font-weight:800;font-size:15.5px;margin-top:6px">${esc(x.title)}</div>
       ${sm ? `<details class="ai"><summary>AI› ${esc(first)} <span class="hint">▾</span></summary><div class="ai-body">${rest}<div class="note">${esc(x.summary.model || "AI")} 한국어 요약 · 원문 확인 필요</div></div></details>`
            : `<div class="hdesc" style="margin-top:6px">AI 요약 준비 중</div>`}
-      <div class="actions"><a class="act" href="${esc(x.url)}" target="_blank" rel="noopener">${x.pdf ? "📄 원문 PDF" : "🔗 원문"}</a></div></div>`;
+      <div class="actions"><a class="act" href="${esc(x.url)}" target="_blank" rel="noopener">${x.pdf ? "📄 원문 PDF" : "🔗 원문"}</a>
+      <button class="act" data-frsave="${esc(x.id)}" style="${svItems["f:" + x.id] ? "color:var(--amber);border-color:var(--amber)" : ""}">${svItems["f:" + x.id] ? "★ 저장됨" : "☆ 저장"}</button></div></div>`;
   }).join("");
-  const local = `<details class="fold" id="sec-local" data-fold="local" ${fold.local ? "" : "open"}><summary class="sec">── 국내 리포트 <span class="fa">▾</span></summary>${krHtml()}</details>`;
+  if(RP) svSync();
+  const sv = Object.entries(svItems).sort((a, b) => b[1].savedAt - a[1].savedAt);
+  const svRow = ([k, x]) => k.startsWith("k:") ? rpItem(x) : `<div class="rpi"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="flex:1;min-width:0;color:inherit;text-decoration:none">
+      <div class="rph">${esc(x.house)} · <span style="color:var(--sub)">해외</span> · ${esc((x.date || "").slice(5).replace("-","/"))}</div><div class="rpt">${esc(x.title)}</div></a>
+      <button class="rpb on" data-frsave="${esc(x.id)}" aria-label="저장">★</button></div>`;
+  const savedBox = `<details class="fold" id="sec-saved" data-fold="saved" ${fold.saved ? "" : "open"}><summary class="sec">── ★ 저장한 리포트 (${sv.length}) <span class="fa">▾</span></summary>
+    ${sv.length ? sv.map(svRow).join("") : `<div class="hdesc" style="margin:10px 0">☆를 누르면 여기에 모입니다. 보관기간이 지나도 저장 해제 전까지 남습니다.</div>`}</details>`;
+  const local = savedBox + `<details class="fold" id="sec-local" data-fold="local" ${fold.local ? "" : "open"}><summary class="sec">── 국내 리포트 <span class="fa">▾</span></summary>${krHtml()}</details>`;
   return local + `<details class="fold" id="sec-foreign" data-fold="foreign" ${fold.foreign ? "" : "open"}><summary class="sec">── 해외 · 하우스뷰 <span class="fa">▾</span></summary>
     <div class="hdesc" style="margin:8px 0">블랙록 · JP모건 · 골드만삭스 · 뱅가드 · 연준 공개 리포트를 Gemini가 한국어로 요약합니다.</div>${rows || '<div class="empty">아직 수집된 리포트가 없습니다</div>'}</details>`;
 }
@@ -756,8 +772,13 @@ function dartHtml(cat){
   if(!DART){ loadDart(); return `<div class="empty">불러오는 중…</div>`; }
   const q = dartQ.trim().toLowerCase();
   const xs = DART.items.filter(x => x.cat === cat && (!q || x.corp.toLowerCase().includes(q) || x.code.includes(q)));
-  let last = "", h = `<input id="dartq" value="${esc(dartQ)}" placeholder="종목명 · 코드 검색" style="width:100%;margin:12px 0 4px;padding:11px;border-radius:6px;border:1px solid #333;background:var(--bg);color:var(--ink);font-size:15px">
-    <div class="hdesc" style="margin:4px 0 8px">최근 30일 · ${xs.length}건${cat === "earn" ? " · 누르면 DART 원문" : ""}</div>`;
+  return `<input id="dartq" value="${esc(dartQ)}" placeholder="종목명 · 코드 검색" style="width:100%;margin:12px 0 4px;padding:11px;border-radius:6px;border:1px solid #333;background:var(--bg);color:var(--ink);font-size:15px">
+    <div id="dartlist">${dartListHtml(cat)}</div>`;
+}
+function dartListHtml(cat){
+  const q = dartQ.trim().toLowerCase();
+  const xs = DART.items.filter(x => x.cat === cat && (!q || x.corp.toLowerCase().includes(q) || x.code.includes(q)));
+  let last = "", h = `<div class="hdesc" style="margin:4px 0 8px">최근 30일 · ${xs.length}건${cat === "earn" ? " · 누르면 DART 원문" : ""}</div>`;
   for(const x of xs.slice(0, 300)){
     const d = x.dt.slice(4,6) + "/" + x.dt.slice(6);
     if(d !== last){ h += `<div class="sec" style="margin-top:14px">── ${d}</div>`; last = d; }
@@ -806,7 +827,7 @@ function dartDetailHtml(){
 }
 document.addEventListener("click", e => { const a = e.target.closest("[data-dart]"); if(!a) return; e.preventDefault(); dartSel = a.dataset.dart; dartBack = [pgId, $("#winbody") ? $("#winbody").scrollTop : 0]; openWin("dd"); }, true);
 let dartBack = null;
-document.addEventListener("input", e => { if(e.target.id === "dartq"){ dartQ = e.target.value; const p = e.target.selectionStart; render(); const i = $("#dartq"); i.focus(); i.setSelectionRange(p, p); } });
+document.addEventListener("input", e => { if(e.target.id === "dartq"){ dartQ = e.target.value; const l = $("#dartlist"); if(l) l.innerHTML = dartListHtml(pgId); } });
 function pageHtml(){
   if(["insider","buyback","dilute","earn"].includes(pgId)){ const w = WHEN[pgId] || [];
     return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + dartHtml(pgId); }
@@ -1053,10 +1074,15 @@ $("#feed").addEventListener("input", e => {
 $("#feed").addEventListener("click", e => {
   if(e.target.closest("[data-rpsel]")){ rpOpen = !rpOpen; render(); return; }
   const rs = e.target.closest("[data-rpsec]"); if(rs){ rpSector = rs.dataset.rpsec; rpOpen = false; store.set("rpSector", rpSector); render(); return; }
-  const sv = e.target.closest("[data-rpsave]"); if(sv){ const id = +sv.dataset.rpsave; rpSaved.has(id) ? rpSaved.delete(id) : rpSaved.add(id); store.set("rpSaved", [...rpSaved]); render(); return; }
+  const sv = e.target.closest("[data-rpsave]"); if(sv){ const id = +sv.dataset.rpsave;
+    if(rpSaved.has(id)){ rpSaved.delete(id); svDel("k:" + id); } else { const x = RP && RP.items.find(y => y.id === id); if(x){ rpSaved.add(id); svPut("k:" + id, x); } }
+    store.set("rpSaved", [...rpSaved]); render(); return; }
+  const fs = e.target.closest("[data-frsave]"); if(fs){ const id = fs.dataset.frsave, k = "f:" + id;
+    if(svItems[k]) svDel(k); else { const x = FR && FR.items.find(y => String(y.id) === id); if(x) svPut(k, {id:x.id, house:x.house, series:x.series, title:x.title, date:x.date, url:x.url}); }
+    render(); return; }
   const ck = e.target.closest("[data-rpread]"); if(ck){ const id = +ck.dataset.rpread; rpRead.has(id) ? rpRead.delete(id) : rpRead.add(id); store.set("rpRead", [...rpRead]); render(); return; }
   const ri = e.target.closest("[data-rp]");
-  if(ri){ const id = +ri.dataset.rp, x = RP.items.find(y => y.id === id); rpRead.add(id); store.set("rpRead", [...rpRead]); render();
+  if(ri){ const id = +ri.dataset.rp, x = (RP && RP.items.find(y => y.id === id)) || svItems["k:" + id]; rpRead.add(id); store.set("rpRead", [...rpRead]); render();
     if(x && x.enc) openPdf(x); else if(x) window.open(x.url, "_blank"); return; }
   const pgb = e.target.closest("[data-pg]");
   if(pgb){ const id = pgb.dataset.pg;
@@ -1119,7 +1145,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795772969";
+const APP_VERSION = "1795775708";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
