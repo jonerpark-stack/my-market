@@ -517,7 +517,28 @@ const HOME_SECTIONS = [
     ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏커버 일수 · 스퀴즈 점수"],
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
-const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1};
+const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1, fg: 1};
+function dashHtml(){
+  if(!KR){ loadKR(); } if(!RT){ loadRT(); }
+  if(!KR) return `<div class="hdesc" style="margin:10px 0">불러오는 중…</div>`;
+  const card = (pg, tab, inner) => `<div data-pg="${pg}" data-ptab="${tab}" style="border:1px solid var(--line);border-radius:8px;padding:9px 10px;cursor:pointer;min-width:0">${inner}</div>`;
+  const idx = Object.entries(KR.idx || {}).map(([m, v]) => card("heat", "macro", `<div style="color:var(--sub);font-size:12px">${m}</div><div style="font-size:17px;font-weight:800">${esc(v.price || "-")}</div><div style="color:${fcol(+v.chg)};font-size:13px">${sgnp(+v.chg)}</div>`)).join("");
+  const g = KR.fg;
+  const fg = g ? card("fg", "macro", `<div style="display:flex;align-items:center;gap:8px"><div>${fgGauge(g.score, false)}</div><div><div style="color:var(--sub);font-size:12px">공포·탐욕</div><div style="font-size:24px;font-weight:800;color:${fgCol(g.score)}">${g.score}</div><div style="color:${fgCol(g.score)};font-size:13px">${esc(g.label)}</div></div></div>`) : "";
+  const k = (KR.idx || {}).KOSPI || {}, q = (KR.idx || {}).KOSDAQ || {};
+  const br = (v, m) => { const t = (v.up || 0) + (v.dn || 0) + (v.flat || 0); if(!t) return ""; const u = v.up / t * 100;
+    return `<div style="font-size:12px;color:var(--sub);margin-top:6px">${m} 상승 ${v.up} · 하락 ${v.dn}</div><div style="height:7px;border-radius:4px;background:#1e88e5;overflow:hidden;margin-top:3px"><div style="height:100%;width:${u.toFixed(1)}%;background:#e53935"></div></div>`; };
+  const flow = card("flow", "kr", `<div style="color:var(--sub);font-size:12px">KOSPI 수급 · 시장 체력</div><div style="display:flex;gap:10px;font-size:13px;margin-top:3px">${[["개인", k.ind], ["외국인", k.frg], ["기관", k.ins]].map(([n, x]) => `<span>${n} <b style="color:${fcol(x)}">${eok(x)}</b></span>`).join("")}</div>${br(k, "KOSPI")}${br(q, "KOSDAQ")}`);
+  const it = c => (RT && RT.items || []).find(x => x.code === c);
+  const mac = [["원/달러", it("FX_USDKRW"), false], ["미 10년", it("US10YT=RR"), true], ["국고 3년", it("KR3YT=RR"), true], ["달러인덱스", it("DXY"), false]].filter(x => x[1] && x[1].price != null);
+  const rates = mac.length ? card("rates", "macro", `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${mac.map(([n, x, b]) => `<div><div style="color:var(--sub);font-size:11.5px">${n}</div><div style="font-weight:700;font-size:14px">${b ? x.price.toFixed(3) + "%" : x.price.toLocaleString("ko-KR", {maximumFractionDigits: 2})} <span style="font-size:11.5px;color:${fcol(x.chg)}">${b ? (x.chg > 0 ? "+" : "") + (x.chg * 100).toFixed(1) + "bp" : sgnp(x.pct)}</span></div></div>`).join("")}</div>`) : "";
+  const b = +k.chg, rs = (KR.sectors || []).filter(x => x.chg != null).map(x => [x.name, x.chg - b]).sort((a, c) => c[1] - a[1]);
+  const li = ([n, d]) => `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n)} <b style="color:${fcol(d)}">${d > 0 ? "+" : ""}${d.toFixed(1)}%p</b></div>`;
+  const sec = rs.length ? card("heat", "macro", `<div style="color:var(--sub);font-size:12px">업종 상대강도 (KOSPI 대비)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;margin-top:4px">
+    <div>${rs.slice(0, 3).map(li).join("")}</div><div>${rs.slice(-3).reverse().map(li).join("")}</div></div>`) : "";
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0">${idx}</div>
+    <div style="display:grid;gap:6px;margin-bottom:6px">${fg}${flow}${rates}${sec}</div><div class="hdesc" style="margin-bottom:8px">${esc((KR.generated || "").slice(11, 16))} 기준 · 카드를 누르면 상세</div>`;
+}
 function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
   const fold = Object.assign({macro: true, kr: true, us: true}, store.get("fold", {}));
@@ -537,8 +558,8 @@ function homeHtml(){
       <span class="htag ${live ? "on" : ""}">${live ? "LIVE" : "준비 중"}</span></div>
       <div class="hdesc">${desc}</div></div>${id === "tg" ? `<div style="padding-left:10px;border-left:1px solid var(--line);margin:0 0 6px 2px">${rows}</div>` : ""}`;
   };
-  const dash = `<div class="hitem" id="h-breadth"><div style="display:flex;align-items:center;gap:8px"><span class="hname">시장 체력</span><span class="htag">준비 중</span></div><div class="hdesc">52주 신고가 · 신저가 수, 상승 · 하락 종목 비율</div></div>
-    <div class="hitem" id="h-funds"><div style="display:flex;align-items:center;gap:8px"><span class="hname">증시 자금</span><span class="htag">준비 중</span></div><div class="hdesc">고객예탁금 · 신용융자 잔고 추이</div></div>`;
+  const dash = dashHtml() + `<div class="hitem" id="h-funds" style="display:none"><div style="display:flex;align-items:center;gap:8px"><span class="hname">시장 체력</span><span class="htag">준비 중</span></div><div class="hdesc">52주 신고가 · 신저가 수, 상승 · 하락 종목 비율</div></div>
+`;
   const homeItem = tab => ([iid, nm, desc]) => { const w = WHEN[iid] || []; const live = !!LIVE[iid];
     return `<div class="hitem" id="h-${iid}" data-pg="${iid}" data-ptab="${tab}" style="cursor:pointer">
       <div style="display:flex;align-items:center;gap:8px"><span class="hname">${esc(nm)}</span>
@@ -834,7 +855,7 @@ document.addEventListener("click", e => { const a = e.target.closest("[data-dart
 let dartBack = null;
 document.addEventListener("input", e => { if(e.target.id === "dartq"){ dartQ = e.target.value; const l = $("#dartlist"); if(l) l.innerHTML = dartListHtml(pgId); } });
 let KR = null, heatSel = null, heatSort = "mv";
-async function loadKR(){ try{ const r = await fetch("krmkt.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ KR = await r.json(); if(state.win === "pg") render(); } }catch(e){} }
+async function loadKR(){ try{ const r = await fetch("krmkt.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ KR = await r.json(); if(state.win === "pg" || state.tab === "home") render(); } }catch(e){} }
 const kcol = c => { if(c == null) return "#222"; const a = Math.min(Math.abs(c) / 4, 1); return c > 0 ? `rgba(229,57,53,${0.18 + a * 0.72})` : c < 0 ? `rgba(30,136,229,${0.18 + a * 0.72})` : "#2a2a2a"; };
 const sgnp = v => v == null ? "-" : (v > 0 ? "+" : "") + v.toFixed(2) + "%";
 const eok = v => v == null ? "-" : (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR") + "억";
@@ -949,7 +970,7 @@ function spark(hist, w = 120, h = 34){
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.6"/></svg>`;
 }
 let RT = null;
-async function loadRT(){ try{ const r = await fetch("rates.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ RT = await r.json(); if(state.win === "pg") render(); } }catch(e){} }
+async function loadRT(){ try{ const r = await fetch("rates.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ RT = await r.json(); if(state.win === "pg" || state.tab === "home") render(); } }catch(e){} }
 function ratesHtml(){
   if(!RT){ loadRT(); return `<div class="empty">불러오는 중…</div>`; }
   const row = x => { const bond = x.cat === "bond";
@@ -1004,7 +1025,28 @@ document.addEventListener("click", e => {
   const t = e.target.closest("[data-heat]"); if(t){ heatSort = "mv"; render(); return; }
   const so = e.target.closest("[data-hsort]"); if(so){ heatSort = so.dataset.hsort; heatSel = null; render(); }
 });
+function fgGauge(sc, big){
+  const W = big ? 300 : 150, r = W / 2 - 12, cx = W / 2, cy = W / 2, a = Math.PI * (1 - sc / 100), x = cx + r * Math.cos(a), y = cy - r * Math.sin(a);
+  const seg = (s0, s1, c) => { const a0 = Math.PI * (1 - s0 / 100), a1 = Math.PI * (1 - s1 / 100); return `<path d="M${cx + r * Math.cos(a0)},${cy - r * Math.sin(a0)} A${r},${r} 0 0 1 ${cx + r * Math.cos(a1)},${cy - r * Math.sin(a1)}" stroke="${c}" stroke-width="${big ? 14 : 9}" fill="none"/>`; };
+  return `<svg width="${W}" height="${W / 2 + 6}" viewBox="0 0 ${W} ${W / 2 + 6}">${seg(0, 25, "#c62828")}${seg(25, 45, "#ef6c00")}${seg(45, 55, "#9e9e9e")}${seg(55, 75, "#7cb342")}${seg(75, 100, "#2e7d32")}
+    <line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#fff" stroke-width="${big ? 3 : 2}"/><circle cx="${cx}" cy="${cy}" r="${big ? 6 : 4}" fill="#fff"/></svg>`;
+}
+const fgCol = sc => sc < 25 ? "#ef5350" : sc < 45 ? "#ffa726" : sc < 55 ? "#bdbdbd" : sc < 75 ? "#9ccc65" : "#43a047";
+function fgHtml(){
+  if(!KR){ loadKR(); return `<div class="empty">불러오는 중…</div>`; }
+  const g = KR.fg; if(!g) return `<div class="empty">지수 이력을 모으는 중입니다 (다음 갱신 후 표시).</div>`;
+  const hs = g.hist || [];
+  return `<div style="text-align:center;margin-top:14px">${fgGauge(g.score, true)}<div style="font-size:38px;font-weight:800;color:${fgCol(g.score)};margin-top:-6px">${g.score}</div>
+    <div style="font-size:16px;color:${fgCol(g.score)};font-weight:700">${esc(g.label)}</div></div>
+    ${hs.length > 5 ? `<div class="sec">── 최근 6개월 추이 <span style="color:var(--sub);font-weight:400;font-size:12px">가격 기반 4개 요소</span></div><div style="text-align:center">${spark(hs, 340, 70)}</div>
+      <div class="hdesc" style="display:flex;justify-content:space-between"><span>${hs[0][0].slice(4,6)}/${hs[0][0].slice(6)}</span><span>${hs[hs.length-1][0].slice(4,6)}/${hs[hs.length-1][0].slice(6)}</span></div>` : ""}
+    <div class="sec">── 구성 요소 <span style="color:var(--sub);font-weight:400;font-size:12px">0 공포 · 100 탐욕</span></div>
+    ${g.parts.map(p => `<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px"><b style="flex:1;font-size:14px">${esc(p.name)}</b><span style="color:var(--sub);font-size:12.5px">${esc(p.val)}</span><b style="width:34px;text-align:right;color:${fgCol(p.score)}">${p.score}</b></div>
+      <div style="height:6px;background:#222;border-radius:3px;margin:6px 0 4px"><div style="height:100%;width:${p.score}%;background:${fgCol(p.score)};border-radius:3px"></div></div><div class="hdesc">${esc(p.desc)}</div></div>`).join("")}
+    <div class="hdesc" style="margin:12px 0">각 요소를 최근 약 1년 분포 안의 백분위로 바꿔 평균한 값 · 25 미만 극단적 공포, 75 이상 극단적 탐욕 · 수석님 8개 지표 방식은 지표 구성을 받으면 그대로 바꿔 넣을 수 있음 · 미국 CNN 지수는 수집 서버 접속이 차단돼 미포함</div>`;
+}
 function pageHtml(){
+  if(pgId === "fg"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + fgHtml(); }
   if(pgId === "rates"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + ratesHtml(); }
   if(pgId === "heat" || pgId === "flow"){ const w = WHEN[pgId] || [];
     return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + (pgId === "heat" ? heatHtml() : flowHtml()); }
@@ -1324,7 +1366,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795780187";
+const APP_VERSION = "1795781604";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
