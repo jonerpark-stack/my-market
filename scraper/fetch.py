@@ -160,7 +160,10 @@ JSON 키 설명 (예시 문구를 그대로 쓰지 말고 원문 내용으로 �
 - 논리 연결어를 자연스럽게 사용: 그런데, 즉, 다만, 따라서, 결국, 오히려, 더군다나
 - 근거 수치는 원문에 있는 것만 인용, 영어 용어는 괄호로 병기 가능
 - 긍정 요인을 말한 뒤 "다만 ~" 으로 리스크·반론을 짚는 균형 잡힌 구성
-- 마지막 줄은 "한줄 요약: ..." 또는 열린 질문("시장의 판단은..?" 처럼)으로 마무리
+- 문장 끝에 마침표(.)를 절대 찍지 않음
+- 마무리에 "시장의 판단은..?" 같은 열린 질문을 넣지 않음. 필요할 때만 마지막 줄을 "한줄 요약: ..."으로 씀
+- 논리적 비약 금지: "A에도 B" "A이므로 B" 처럼 쓸 때는 왜 그런지 원문에 있는 이유를 같은 줄이나 바로 다음 줄에 반드시 적을 것
+- 원문에 이유가 없으면 인과관계로 연결하지 말고 사실만 나열할 것 (추측으로 이유를 지어내지 말 것)
 - AI가 썼다는 표현, "투자 권유 아님" 같은 문구 금지
 
 [채널] {channel}
@@ -241,6 +244,10 @@ def ai_comment(post: dict, channel_name: str) -> dict | None:
         print(f"[AI] {post['uid']} 실패: {e}", file=sys.stderr)
         return None
     parsed = _parse_ai_json(content)
+    if parsed:
+        parsed["take"] = "\n".join(l.rstrip().rstrip(".").rstrip() for l in parsed.get("take", "").splitlines() if l.strip()
+                                   and not l.strip().startswith("시장의 판단"))
+        parsed["tv"] = 2
     if parsed and ("핵심 한 줄" in parsed["key"] or len(parsed["key"]) < 12):
         return None
     if parsed:
@@ -292,7 +299,7 @@ def main():
     for p in posts:
         if budget <= 0:
             break
-        if (p.get("ai") and p["ai"].get("take")) or len(p["text"]) < 80 or datetime.fromisoformat(p["date"]) < ai_window:
+        if (p.get("ai") and p["ai"].get("take") and p["ai"].get("tv") == 2) or len(p["text"]) < 80 or datetime.fromisoformat(p["date"]) < ai_window:
             continue
         p["ai"] = ai_comment(p, names.get(p["channel"], p["channel"]))
         budget -= 1
