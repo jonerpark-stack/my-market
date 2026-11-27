@@ -414,7 +414,7 @@ async function loadHist(t){
   SQH[t] = "loading";
   try{ const r = await fetch(`sqhist/${encodeURIComponent(t)}.json?t=` + Date.now(), {cache:"no-store"}); SQH[t] = r.ok ? await r.json() : "none"; }
   catch(e){ SQH[t] = "none"; }
-  if(state.tab === "sq") render();
+  if(state.tab === "sq" || state.tab === "sqd") render();
 }
 function histChart(h){
   const W = 360, H = 190, L = 40, Rr = 44, T = 14, B = 26, iw = W - L - Rr, ih = H - T - B;
@@ -452,10 +452,43 @@ function histHtml(r){
   return `<div class="sqhist">${histChart(h)}
     <div class="hdesc" style="margin-top:6px">최근 잔고 ${last ? last[1].toLocaleString() + "주 (" + last[0] + ")" : "-"}${ch != null ? ` · 3개월 전 대비 <b style="color:${ch>=0?"var(--up)":"var(--down)"}">${ch>=0?"+":""}${(ch*100).toFixed(0)}%</b>` : ""}</div></div>`;
 }
+let sqSel = null, sqScroll = 0;
+function sqDetailHtml(){
+  const r = SQ && SQ.rows.find(x => x.t === sqSel);
+  if(!r) return `<button class="more" data-sqback="1" style="padding:12px 0 0">← SHORT SQUEEZE</button><div class="empty">종목을 찾을 수 없습니다.</div>`;
+  const h = SQH[r.t];
+  if(r.hist && (!h || h === "loading")) loadHist(r.t);
+  const ok = h && h !== "loading" && h !== "none" && h.px && h.px.length;
+  const cls = v => v == null ? "" : v >= 0 ? "u" : "d";
+  const rank = SQ.rows.indexOf(r) + 1;
+  const siRows = ok ? h.si.slice(-10).reverse().map((x, i, a) => { const p = a[i+1]; const c = p && p[1] ? x[1]/p[1]-1 : null;
+      return `<span>${x[0]}</span><b>${x[1].toLocaleString()}</b><b class="${cls(c)}">${c == null ? "-" : (c>=0?"+":"") + (c*100).toFixed(1) + "%"}</b><b>${x[2] != null ? (+x[2]).toFixed(1) + "일" : "-"}</b>`; }).join("") : "";
+  return `<button class="more" data-sqback="1" style="padding:12px 0 0">← SHORT SQUEEZE</button>
+  <div style="display:flex;align-items:baseline;gap:10px;margin-top:10px"><span style="font:800 26px var(--mono);color:var(--amber)">${esc(r.t)}</span>
+    <span style="color:var(--sub);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name || r.issue || "")}</span></div>
+  <div style="display:flex;align-items:center;gap:10px;margin:8px 0"><span style="font:800 30px var(--mono)">${r.score.toFixed(0)}</span>
+    <span class="hdesc">스퀴즈 점수 · ${SQ.rows.length}종목 중 ${rank}위</span></div>
+  <div class="sqbar"><i style="width:${r.score}%"></i></div>
+  ${r.signals && r.signals.length ? `<div class="sqsig">${r.signals.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
+  <div class="sec">── 공매도 잔고 · 주가 추이</div>
+  ${!r.hist ? `<div class="hdesc" style="margin-top:8px">이력은 점수 상위 120종목과 급등 신호 종목만 제공됩니다.</div>` : ok ? histChart(h) : `<div class="hdesc" style="margin-top:8px">추이 불러오는 중…</div>`}
+  <div class="sec">── 핵심 지표</div>
+  <div class="sqg" style="margin-top:10px;font-size:13px">
+    <span>현재가</span><b>$${r.price < 10 ? r.price.toFixed(2) : r.price.toFixed(1)}</b><span>1일</span><b class="${cls(r.ret1)}">${pctS(r.ret1)}</b>
+    <span>5일</span><b class="${cls(r.ret5)}">${pctS(r.ret5)}</b>
+    <span>공매도 잔고</span><b>${(r.si||0).toLocaleString()}</b><span>잔고 증감</span><b class="${cls(r.sichg)}">${pctS(r.sichg,1)}</b>
+    <span>잔고 금액</span><b>${fmtUsd(r.sival)}</b><span>숏커버 일수</span><b>${r.dtc ? r.dtc.toFixed(1) + "일" : "-"}</b>
+    <span>공매도 비중(5일)</span><b>${r.svr ? (r.svr*100).toFixed(0) + "%" : "-"}</b><span>거래량(5일/60일)</span><b>${r.surge.toFixed(2)}배</b>
+    <span>거래대금(20일)</span><b>${fmtUsd(r.dv20)}</b><span>Reddit 언급</span><b>${r.reddit || 0}회</b>
+  </div>
+  ${siRows ? `<div class="sec">── 공매도 잔고 기록</div>
+  <div class="sqg" style="grid-template-columns:auto 1fr auto auto;margin-top:10px;font-size:12.5px"><span>기준일</span><b style="color:var(--sub)">잔고(주)</b><b style="color:var(--sub)">증감</b><b style="color:var(--sub)">숏커버</b>${siRows}</div>` : ""}
+  <div class="hdesc" style="margin-top:14px;font-size:12px">공매도 잔고 기준일 ${esc(SQ.si_date)} · 출처 FINRA · Yahoo · ApeWisdom</div>`;
+}
 function sqRow(r, i){
   const cls = v => v == null ? "" : v >= 0 ? "u" : "d";
   return `<div class="sqr" data-sqt="${esc(r.t)}" style="cursor:pointer">
-    <div class="sqh"><span class="sqn">${i+1}</span><a class="sqt" href="https://finance.yahoo.com/quote/${encodeURIComponent(r.t)}" target="_blank" rel="noopener">${esc(r.t)}</a>
+    <div class="sqh"><span class="sqn">${i+1}</span><button class="sqt" data-sqd="${esc(r.t)}" style="border:0;background:none;padding:0">${esc(r.t)} ›</button>
       <span class="sqnm">${esc((r.name || r.issue || "").slice(0,28))}</span><span class="sqs">${r.score.toFixed(0)}</span></div>
     <div class="sqbar"><i style="width:${r.score}%"></i></div>
     <div class="sqg">
@@ -490,10 +523,11 @@ function sqHtml(){
   ${rows.slice(0, 60).map(sqRow).join("") || `<div class="empty">${st.sub==="find" ? "검색어를 입력하세요" : "조건에 맞는 종목이 없습니다"}</div>`}`;
 }
 function render(){
-  document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab || (state.tab === "sq" && b.dataset.tab === "home")));
+  document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab || ((state.tab === "sq" || state.tab === "sqd") && b.dataset.tab === "home")));
   if(!state.chip || !DATA.channels.some(c=>c.id===state.chip)) state.chip = DATA.channels[0].id;
   markSeen();
   renderChips();
+  if(state.tab === "sqd"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = sqDetailHtml(); return; }
   if(state.tab === "sq"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = sqHtml(); return; }
   if(state.tab === "home"){ $("#feed").innerHTML = homeHtml(); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
   const list = state.tab === "report" ? DATA.posts.filter(p => p.report && !REPORT_EXCLUDE.includes(p.channel)) : postsFor(state.tab, state.chip);
@@ -659,7 +693,7 @@ $("#feed").addEventListener("toggle", e => {
       if(i >= 0 && i < ids.length){ state.chip = ids[i]; store.set("chip2", state.chip); render(); scrollTo(0,0);
         const on = document.querySelector(".chip.on"); on && on.scrollIntoView({inline:"center", block:"nearest", behavior:"smooth"}); return; }
     }
-    const base = state.tab === "sq" ? "home" : state.tab, j = TABS.indexOf(base) + dir;
+    const base = (state.tab === "sq" || state.tab === "sqd") ? "home" : state.tab, j = TABS.indexOf(base) + dir;
     if(j >= 0 && j < TABS.length){ state.tab = TABS[j]; store.set("tab2", state.tab);
       if(state.tab === "telegram") state.chip = dir > 0 ? DATA.channels[0].id : DATA.channels[DATA.channels.length-1].id;
       render(); scrollTo(0,0); }
@@ -702,8 +736,11 @@ $("#feed").addEventListener("input", e => {
   if(e.target.id === "sqq"){ sqState.q = e.target.value; store.set("sq", sqState); const pos = e.target.selectionStart; render(); const el = $("#sqq"); el.focus(); el.setSelectionRange(pos, pos); }
 });
 $("#feed").addEventListener("click", e => {
+  const sd = e.target.closest("[data-sqd]");
+  if(sd){ sqSel = sd.dataset.sqd; state.tab = "sqd"; sqScroll = scrollY; render(); scrollTo(0,0); return; }
+  if(e.target.closest("[data-sqback]")){ state.tab = "sq"; render(); scrollTo(0, sqScroll || 0); return; }
   const sr = e.target.closest("[data-sqt]");
-  if(sr && !e.target.closest("a")){ const t = sr.dataset.sqt; sqOpen.has(t) ? sqOpen.delete(t) : sqOpen.add(t); render(); return; }
+  if(sr && !e.target.closest("a,button")){ const t = sr.dataset.sqt; sqOpen.has(t) ? sqOpen.delete(t) : sqOpen.add(t); render(); return; }
   const sb = e.target.closest("[data-sqsub]"); if(sb){ sqState.sub = sb.dataset.sqsub; store.set("sq", sqState); render(); return; }
   const sf = e.target.closest("[data-sq]"); if(sf){ sqState[sf.dataset.sq] = +sf.dataset.v; store.set("sq", sqState); render(); return; }
   const gt = e.target.closest("[data-gotab]");
@@ -752,7 +789,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795756071";
+const APP_VERSION = "1795756521";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});

@@ -176,7 +176,10 @@ N_HIST = 120
 def finra_hist(t):
     api = "https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest"
     h = {"Content-Type": "application/json", "Accept": "application/json"}
-    body = {"limit": 60, "compareFilters": [{"compareType": "EQUAL", "fieldName": "symbolCode", "fieldValue": t}]}
+    start = (datetime.now(KST).date() - timedelta(days=730)).isoformat()
+    body = {"limit": 100, "compareFilters": [{"compareType": "EQUAL", "fieldName": "symbolCode", "fieldValue": t}],
+            "dateRangeFilters": [{"fieldName": "settlementDate", "startDate": start,
+                                  "endDate": datetime.now(KST).date().isoformat()}]}
     rows = json.loads(_get(api, json.dumps(body).encode(), h) or b"[]")
     out = sorted({r["settlementDate"]: [r["settlementDate"], r.get("currentShortPositionQuantity") or 0,
                                        r.get("daysToCoverQuantity")] for r in rows}.values())
