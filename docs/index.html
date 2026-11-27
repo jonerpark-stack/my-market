@@ -37,8 +37,9 @@ header{position:sticky;top:0;z-index:10;background:var(--bg);padding-top:env(saf
 .top h1{margin:0;font:800 17px var(--mono);color:var(--amber);letter-spacing:.5px}
 .top .meta{display:flex;align-items:center;gap:6px;color:var(--sub);font:12px var(--mono)}
 .icon-btn{border:1px solid #333;background:transparent;border-radius:6px;width:36px;height:36px;font-size:15px}
-.tabs{display:flex;gap:0;padding:4px 16px 0}
-.tab{flex:1;border:0;background:none;padding:9px 0;font:700 14px var(--mono);color:var(--sub);border-bottom:2px solid #222}
+.tabs{display:flex;gap:0;padding:4px 10px 0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1 0 auto;border:0;background:none;padding:9px 7px;font:700 13px var(--mono);color:var(--sub);border-bottom:2px solid #222;white-space:nowrap}
 .tab.on{color:var(--amber);border-bottom-color:var(--amber)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 12px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
@@ -157,8 +158,11 @@ details.ai summary .hint{color:var(--sub)}
     </div>
     <nav class="tabs" id="tabs">
       <button class="tab on" data-tab="home">홈</button>
-      <button class="tab" data-tab="telegram">텔레그램 시황</button>
+      <button class="tab" data-tab="telegram">텔레그램</button>
       <button class="tab" data-tab="report">리포트</button>
+      <button class="tab" data-tab="macro">매크로</button>
+      <button class="tab" data-tab="kr">한국수급</button>
+      <button class="tab" data-tab="us">미국수급</button>
     </nav>
     <div class="chips" id="chips"></div>
   </header>
@@ -353,8 +357,7 @@ function grouped(list, fn){
   return out;
 }
 const HOME_SECTIONS = [
-  ["macro", "매크로 · 시장 개관", [
-    ["tg", "텔레그램 시황", "증권사 시황 채널 5곳 최신 글 + AI 요약"],
+  ["macro", "매크로", [
     ["rates", "금리 · 환율 보드", "원/달러 · 미 2Y/10Y · 국고채 3Y · 장단기 금리차"],
     ["earn", "잠정실적 · 어닝 서프라이즈", "잠정실적 공시와 전년 대비 증감"],
     ["cal", "한미 이벤트 캘린더", "실적 발표 · FOMC · 금통위 · 휴장일 · 지수 변경"],
@@ -397,7 +400,7 @@ function homeHtml(){
   const dash = `<div class="hitem" id="h-breadth"><div style="display:flex;align-items:center;gap:8px"><span class="hname">시장 체력</span><span class="htag">준비 중</span></div><div class="hdesc">52주 신고가 · 신저가 수, 상승 · 하락 종목 비율</div></div>
     <div class="hitem" id="h-funds"><div style="display:flex;align-items:center;gap:8px"><span class="hname">증시 자금</span><span class="htag">준비 중</span></div><div class="hdesc">고객예탁금 · 신용융자 잔고 추이</div></div>`;
   return box("dash", "대시보드", dash) + box("watch", "관심 종목 · 스크리너", soon) +
-    HOME_SECTIONS.map(([id, t, items]) => box(id, t, items.map(i => item(...i)).join(""))).join("");
+    box("latest", "채널별 최신 시황", `<div style="padding-left:2px">${rows}</div>`);
 }
 const REPORT_EXCLUDE = ["globalmktinsight"];   // 리포트 탭에서 제외
 const INSITE = ["ehdwl"];                       // 텔레그램으로 넘기지 않고 사이트 안에서 본문 표시
@@ -511,7 +514,7 @@ function sqHtml(){
   if(st.sub === "sig") rows = rows.filter(r => (r.signals||[]).some(x => /급증|급등|잔고 \+/.test(x)));
   if(st.sub === "find"){ const q = st.q.trim().toUpperCase(); rows = q ? SQ.rows.filter(r => r.t.includes(q) || (r.name||"").toUpperCase().includes(q)) : []; }
   const sub = (k, l) => `<button class="tab ${st.sub===k?"on":""}" data-sqsub="${k}">${l}</button>`;
-  return `<button class="more" data-gotab="home" style="padding:12px 0 0">← 홈</button>
+  return `<button class="more" data-gotab="us" style="padding:12px 0 0">← 미국 수급</button>
   <div class="sec" style="margin-top:6px">── SHORT SQUEEZE US</div>
   <div class="hdesc" style="margin:8px 0;line-height:1.7">공매도 잔고 기준일 <b style="color:var(--ink)">${esc(SQ.si_date)}</b> · 일별 공매도 ${esc((SQ.regsho_date||"").replace(/(\d{4})(\d\d)(\d\d)/,"$1-$2-$3"))} · 계산 ${fmtTime(SQ.generated)}<br>
   공매도 잔고는 월 2회만 공개됩니다. 점수(0~100)는 숏커버 일수·잔고 증감·공매도 비중·거래량·주가·Reddit을 합친 <b style="color:var(--amber)">상대 순위</b>입니다. 유통주식수·대차 수수료는 미수집.</div>
@@ -522,11 +525,54 @@ function sqHtml(){
   <div class="hdesc" style="margin:6px 0">${rows.length}종목</div>
   ${rows.slice(0, 60).map(sqRow).join("") || `<div class="empty">${st.sub==="find" ? "검색어를 입력하세요" : "조건에 맞는 종목이 없습니다"}</div>`}`;
 }
+const PLAN = {
+  rates: "FRED · Yahoo 데이터로 원/달러, 미 2년·10년, 국고채 3년, 장단기 금리차 추이를 보여줍니다.",
+  earn: "DART 잠정실적 공시를 모아 전년 대비 매출·영업이익 증감과 서프라이즈 여부를 표시합니다. (OpenDART 키 필요)",
+  cal: "미국 실적 발표, FOMC, 금통위, 휴장일, 지수 정기변경 일정을 한 달력에 모읍니다.",
+  heat: "KOSPI · KOSDAQ 업종별 · 종목별 등락을 시가총액 크기로 칠한 히트맵입니다.",
+  fg: "수석님 방식대로 한국 공포·탐욕 지수(8개 지표)와 과열도 지수(8개 지표)를 1년·3년 백분위로 계산합니다.",
+  flow: "KOSPI · KOSDAQ 외국인 · 기관 일별 순매수와 업종별 흐름을 보여줍니다.",
+  samo: "투자자 구분 중 사모펀드의 순매수 · 순매도 상위 종목과 종목별 추이입니다.",
+  credit: "신용융자 잔고 · 대차잔고 증감 상위 종목입니다.",
+  insider: "임원 · 주요주주의 장내 매수 · 매도 공시를 모읍니다. (OpenDART 키 필요)",
+  buyback: "자사주 취득 · 소각 · 처분 공시와 공시 후 주가 반응입니다. (OpenDART 키 필요)",
+  dilute: "유상증자 · CB · BW 발행 공시 경보판입니다. (OpenDART 키 필요)",
+  rebal: "KOSPI200 · KOSDAQ150 정기변경 편입 · 편출 예상 종목입니다.",
+  guru: "SEC 13F로 유명 투자자 포트폴리오와 분기별 매매를 보여줍니다.",
+  active: "ARK 등 액티브 ETF의 일별 보유종목 변화(매수 · 매도)입니다.",
+  reddit: "Reddit 언급 급증 종목과 서학개미 관심 종목입니다."
+};
+const SEC_TABS = {macro: 0, kr: 1, us: 2};
+let pgId = null, pgFrom = "macro";
+function secListHtml(tab){
+  const [id, t, items] = HOME_SECTIONS[SEC_TABS[tab]];
+  return `<div class="sec" style="margin-top:14px">── ${esc(t)}</div>` + items.map(([iid, nm, desc]) => {
+    const live = !!LIVE[iid];
+    return `<div class="hitem" data-pg="${iid}" style="cursor:pointer">
+      <div style="display:flex;align-items:center;gap:8px"><span class="hname">${esc(nm)}</span>
+      <span class="htag ${live ? "on" : ""}">${live ? "LIVE" : "준비 중"}</span><span style="margin-left:auto;color:var(--sub)">›</span></div>
+      <div class="hdesc">${esc(desc)}</div></div>`;
+  }).join("");
+}
+function pageHtml(){
+  const all = HOME_SECTIONS.flatMap(x => x[2]);
+  const it = all.find(x => x[0] === pgId) || ["", "", ""];
+  const parent = HOME_SECTIONS[SEC_TABS[pgFrom]][1];
+  return `<button class="more" data-back="${pgFrom}" style="padding:12px 0 0">← ${esc(parent)}</button>
+    <div style="font:800 22px var(--mono);color:var(--amber);margin:12px 0 4px">${esc(it[1])}</div>
+    <div class="hdesc">${esc(it[2])}</div>
+    <div class="sec">── 준비 중</div>
+    <div class="linkcard" style="display:block;color:var(--sub);font-size:13.5px;line-height:1.7">${esc(PLAN[pgId] || "곧 추가됩니다.")}</div>`;
+}
 function render(){
-  document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab || ((state.tab === "sq" || state.tab === "sqd") && b.dataset.tab === "home")));
+  const cur = (state.tab === "sq" || state.tab === "sqd") ? "us" : state.tab === "pg" ? pgFrom : state.tab;
+  document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === cur));
+  const onTab = document.querySelector("#tabs .tab.on"); onTab && onTab.scrollIntoView({inline:"nearest", block:"nearest"});
   if(!state.chip || !DATA.channels.some(c=>c.id===state.chip)) state.chip = DATA.channels[0].id;
   markSeen();
   renderChips();
+  if(SEC_TABS[state.tab] != null){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = secListHtml(state.tab); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
+  if(state.tab === "pg"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = pageHtml(); return; }
   if(state.tab === "sqd"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = sqDetailHtml(); return; }
   if(state.tab === "sq"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = sqHtml(); return; }
   if(state.tab === "home"){ $("#feed").innerHTML = homeHtml(); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
@@ -680,7 +726,7 @@ $("#feed").addEventListener("toggle", e => {
 }, true);
 {
   let sx = 0, sy = 0, st = 0;
-  const TABS = ["home", "telegram", "report"];
+  const TABS = ["home", "telegram", "report", "macro", "kr", "us"];
   document.addEventListener("touchstart", e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, {passive:true});
   document.addEventListener("touchend", e => {
     if(!DATA || $("#app").classList.contains("hidden") || !$("#sheet").classList.contains("hidden") || !$("#drawer").classList.contains("hidden")) return;
@@ -693,7 +739,7 @@ $("#feed").addEventListener("toggle", e => {
       if(i >= 0 && i < ids.length){ state.chip = ids[i]; store.set("chip2", state.chip); render(); scrollTo(0,0);
         const on = document.querySelector(".chip.on"); on && on.scrollIntoView({inline:"center", block:"nearest", behavior:"smooth"}); return; }
     }
-    const base = (state.tab === "sq" || state.tab === "sqd") ? "home" : state.tab, j = TABS.indexOf(base) + dir;
+    const base = (state.tab === "sq" || state.tab === "sqd") ? "us" : state.tab === "pg" ? pgFrom : state.tab, j = TABS.indexOf(base) + dir;
     if(j >= 0 && j < TABS.length){ state.tab = TABS[j]; store.set("tab2", state.tab);
       if(state.tab === "telegram") state.chip = dir > 0 ? DATA.channels[0].id : DATA.channels[DATA.channels.length-1].id;
       render(); scrollTo(0,0); }
@@ -701,16 +747,13 @@ $("#feed").addEventListener("toggle", e => {
 }
 function buildMenu(){
   const l3 = (act, label, live) => `<button class="l3" data-act="${act}">${esc(label)}${live ? '<span class="live">LIVE</span>' : ""}</button>`;
-  const homeGroups = [["dash", "대시보드", [["breadth","시장 체력"],["funds","증시 자금"]]], ["watch", "관심 종목 · 스크리너", []]]
-    .concat(HOME_SECTIONS.map(([id, t, items]) => [id, t, items.map(i => [i[0], i[1]])]));
-  const homeHtml2 = homeGroups.map(([id, t, items]) => items.length
-    ? `<details><summary class="l2">${esc(t)}</summary>${l3("sec:" + id, t + " 전체")}${items.map(([iid, nm]) => l3("item:" + id + ":" + iid, nm, !!LIVE[iid])).join("")}</details>`
-    : `<div class="l2 go" data-act="sec:${id}">${esc(t)}</div>`).join("");
-  const tg = DATA.channels.map(c => l3("ch:" + c.id, c.name)).join("");
+  const sec = (tab) => { const [id, t, items] = HOME_SECTIONS[SEC_TABS[tab]];
+    return `<details><summary class="l1">${esc(t)}</summary>${l3("tab:" + tab, t + " 전체")}${items.map(([iid, nm]) => l3("pg:" + tab + ":" + iid, nm, !!LIVE[iid])).join("")}</details>`; };
   $("#dnav").innerHTML = `<h3>JP View 목차</h3>
-    <details open><summary class="l1">홈</summary>${homeHtml2}</details>
-    <details><summary class="l1">텔레그램 시황</summary>${tg}</details>
-    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}${l3("rep:foreign", "해외 · 하우스뷰")}${l3("rep:local", "국내 · 채널 리포트")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>`;
+    <details open><summary class="l1">홈</summary>${l3("home:dash", "대시보드")}${l3("home:watch", "관심 종목 · 스크리너")}${l3("home:latest", "채널별 최신 시황")}</details>
+    <details><summary class="l1">텔레그램</summary>${DATA.channels.map(c => l3("ch:" + c.id, c.name)).join("")}</details>
+    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}${l3("rep:foreign", "해외 · 하우스뷰")}${l3("rep:local", "국내 · 채널 리포트")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>
+    ${sec("macro")}${sec("kr")}${sec("us")}`;
 }
 function menu(open){ if(open) buildMenu(); $("#drawer").classList.toggle("hidden", !open); }
 $("#menuBtn").addEventListener("click", () => menu(true));
@@ -723,19 +766,22 @@ $("#drawer").addEventListener("click", e => {
   if(kind === "tab"){ state.tab = x; store.set("tab2", x); render(); scrollTo(0,0); return; }
   if(kind === "rep"){ state.tab = "report"; store.set("tab2","report"); const f = store.get("fold", {}); f[x] = false; store.set("fold", f); render();
     setTimeout(() => { const el = document.getElementById("sec-" + x); el && scrollTo({top: el.getBoundingClientRect().top + scrollY - document.querySelector("header").offsetHeight - 8, behavior:"smooth"}); }, 300); return; }
-  if(y && LIVE[y] === "sq"){ state.tab = "sq"; render(); scrollTo(0,0); return; }
-  if(y && LIVE[y] === "telegram"){ state.tab = "telegram"; store.set("tab2","telegram"); render(); scrollTo(0,0); return; }
-  state.tab = "home"; store.set("tab2","home");
-  const f = store.get("fold", {}); f[x] = false; store.set("fold", f);
-  render();
-  const el = document.getElementById(y ? "h-" + y : "sec-" + x);
-  if(el){ const top = el.getBoundingClientRect().top + scrollY - (document.querySelector("header").offsetHeight + 8); scrollTo({top, behavior:"smooth"});
-    if(y){ el.style.transition = "background .6s"; el.style.background = "#1a1400"; setTimeout(() => el.style.background = "", 1400); } }
+  if(kind === "pg"){ pgFrom = x; if(LIVE[y] === "sq"){ state.tab = "sq"; } else { pgId = y; state.tab = "pg"; } render(); scrollTo(0,0); return; }
+  if(kind === "home"){ state.tab = "home"; store.set("tab2","home"); const f = store.get("fold", {}); f[x] = false; store.set("fold", f); render();
+    const el = document.getElementById("sec-" + x);
+    if(el) scrollTo({top: el.getBoundingClientRect().top + scrollY - (document.querySelector("header").offsetHeight + 8), behavior:"smooth"});
+    return; }
 });
 $("#feed").addEventListener("input", e => {
   if(e.target.id === "sqq"){ sqState.q = e.target.value; store.set("sq", sqState); const pos = e.target.selectionStart; render(); const el = $("#sqq"); el.focus(); el.setSelectionRange(pos, pos); }
 });
 $("#feed").addEventListener("click", e => {
+  const pgb = e.target.closest("[data-pg]");
+  if(pgb){ const id = pgb.dataset.pg; pgFrom = state.tab;
+    if(LIVE[id] === "sq"){ state.tab = "sq"; } else { pgId = id; state.tab = "pg"; }
+    render(); scrollTo(0,0); return; }
+  const bk = e.target.closest("[data-back]");
+  if(bk){ state.tab = bk.dataset.back; store.set("tab2", state.tab); render(); scrollTo(0,0); return; }
   const sd = e.target.closest("[data-sqd]");
   if(sd){ sqSel = sd.dataset.sqd; state.tab = "sqd"; sqScroll = scrollY; render(); scrollTo(0,0); return; }
   if(e.target.closest("[data-sqback]")){ state.tab = "sq"; render(); scrollTo(0, sqScroll || 0); return; }
@@ -789,7 +835,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795757570";
+const APP_VERSION = "1795759030";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
