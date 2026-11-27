@@ -533,6 +533,25 @@ function sqRow(r, i){
     <div class="hdesc" style="margin-top:6px;font-size:11px">${sqOpen.has(r.t) ? "▴ 접기" : "▾ 눌러서 공매도 잔고 · 주가 추이 보기"}</div>
   </div>`;
 }
+let BT;
+async function loadBT(){
+  try{ const r = await fetch("backtest.json?t=" + Date.now(), {cache:"no-store"}); BT = r.ok ? await r.json() : null; }catch(e){ BT = null; }
+  if(state.win === "sq") render();
+}
+function btHtml(){
+  if(BT === undefined){ loadBT(); return ""; }
+  if(!BT) return `<div class="sec">── 점수 검증 (백테스트)</div><div class="hdesc" style="margin-top:8px">과거 2년 데이터를 모으는 중입니다. 완료되면 점수 구간별 실제 급등률이 여기에 표시됩니다.</div>`;
+  const P = v => v == null ? "-" : (v*100).toFixed(1) + "%";
+  const row = (lab, x) => `<span>${lab}</span><b>${x.n.toLocaleString()}</b><b>${P(x.hitv)}<small style="color:var(--sub);font-weight:400"> (${P(x.hitv_ci[0])}~${P(x.hitv_ci[1])})</small></b><b>${P(x.hit)}</b><b class="${x.r20_mean>=0?"u":"d"}">${P(x.r20_mean)}</b>`;
+  const d = BT.diff_70_vs_50;
+  return `<div class="sec">── 점수 검증 (백테스트)</div>
+    <div class="hdesc" style="margin:8px 0">${esc(BT.period[0])} ~ ${esc(BT.period[1])} · ${BT.dates}개 시점 · ${BT.tickers}종목 · 관측 ${BT.obs.toLocaleString()}건</div>
+    <div class="sqg" style="grid-template-columns:auto auto 1fr auto auto;font-size:12px"><span>점수</span><b style="color:var(--sub)">건수</b><b style="color:var(--sub)">급등률 (95% 범위)</b><b style="color:var(--sub)">+30%↑</b><b style="color:var(--sub)">20일 수익</b>
+    ${["70+","50~70","30~50","0~30"].map(k => row(k, BT.bands[k])).join("")}${row("전체", BT.all)}</div>
+    <div class="hdesc" style="margin-top:8px;line-height:1.6">급등률 = ${esc(BT.hitv_def || "")}<br>+30%↑ = ${esc(BT.hit_def)} (변동성이 큰 소형주일수록 높게 나와 참고용)</div>
+    ${d && d.est != null ? `<div class="hdesc" style="margin-top:6px">70점 이상과 50점 미만의 급등률 차이: <b style="color:var(--ink)">${(d.est*100>=0?"+":"") + (d.est*100).toFixed(1)}%p</b>${d.ci95 ? ` (95% 신뢰구간 ${(d.ci95[0]*100).toFixed(1)} ~ ${(d.ci95[1]*100).toFixed(1)}%p)` : ""}</div>` : ""}
+    <div class="sqnote" style="margin-top:6px">Reddit·일별 공매도 비중은 과거 자료가 없어 제외하고 계산. 현재 상장 종목만 사용해 생존 편향이 있을 수 있음. 공매도 잔고 공개 지연(약 8거래일)을 반영해 미래 정보는 쓰지 않음.</div>`;
+}
 function sqHtml(){
   if(!SQ){ loadSQ(); return `<div class="empty">불러오는 중…</div>`; }
   const st = sqState;
@@ -556,6 +575,7 @@ function sqHtml(){
       <div class="sqf"><span>잔고 금액</span>${btn("sv",0,"전체")}${btn("sv",1e7,"1천만$↑")}${btn("sv",1e8,"1억$↑")}${btn("sv",1e9,"10억$↑")}</div>`}
   <div class="hdesc" style="margin:6px 0">${rows.length}종목</div>
   ${rows.slice(0, 60).map(sqRow).join("") || `<div class="empty">${st.sub==="find" ? "검색어를 입력하세요" : "조건에 맞는 종목이 없습니다"}</div>`}
+  ${btHtml()}
   <div class="sec">── 데이터 기준</div>
   <div class="hdesc" style="margin:10px 0 0;line-height:1.7">공매도 잔고 기준일 <b style="color:var(--ink)">${esc(SQ.si_date)}</b> · 일별 공매도 ${esc((SQ.regsho_date||"").replace(/(\d{4})(\d\d)(\d\d)/,"$1-$2-$3"))} · 계산 ${fmtTime(SQ.generated)}<br>
   공매도 잔고는 월 2회만 공개됩니다. 점수(0~100)는 숏커버 일수·잔고 증감·공매도 비중·거래량·주가·Reddit을 합친 <b style="color:var(--amber)">상대 순위</b>입니다. 유통주식수·대차 수수료는 미수집.</div>`;
@@ -909,7 +929,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795764799";
+const APP_VERSION = "1795766207";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});

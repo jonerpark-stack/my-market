@@ -23,6 +23,7 @@ UA = {"User-Agent": "Mozilla/5.0 (JP INVESTMENT personal dashboard)"}
 BUDGET = 150
 W = {"dtc": .30, "sichg": .25, "surge": .20, "mom": .15, "sival": .10}
 LAG, HORIZON, HIT = 8, 20, .30
+ZV = 2.0   # 변동성 대비 급등: 최대 상승폭 ≥ 평소 20일 변동성의 2배
 
 
 def fetch_px(t):
@@ -90,10 +91,12 @@ def compute():
             v5 = sum(p[2] for p in px[i0 - 4:i0 + 1]) / 5
             v60 = (sum(p[2] for p in px[i0 - 59:i0 + 1]) / 60) or 1
             fut = [p[1] for p in px[i0 + 1:i0 + HORIZON + 1]]
+            vol = (sum((px[j][1] / px[j - 1][1] - 1) ** 2 for j in range(i0 - 59, i0 + 1)) / 60) ** .5
             obs.setdefault(px[i0][0], []).append({
                 "t": t, "dtc": dtc, "sichg": (cur / prev - 1) if prev else None,
                 "surge": v5 / v60, "mom": c0 / px[i0 - 5][1] - 1, "sival": cur * c0,
-                "maxup": max(fut) / c0 - 1, "r20": fut[-1] / c0 - 1})
+                "maxup": max(fut) / c0 - 1, "r20": fut[-1] / c0 - 1,
+                "hitv": bool(vol) and (max(fut) / c0 - 1) / (vol * HORIZON ** .5) >= ZV})
     rows = []
     for d, lst in obs.items():
         if len(lst) < 30:
@@ -111,7 +114,9 @@ def compute():
         k = sum(1 for o in sub if o["maxup"] >= HIT)
         mean = lambda key: round(sum(o[key] for o in sub) / n, 4) if n else None
         med = lambda key: round(sorted(o[key] for o in sub)[n // 2], 4) if n else None
+        kv = sum(1 for o in sub if o["hitv"])
         return {"n": n, "hit": round(k / n, 4) if n else None, "hit_ci": wilson(k, n),
+                "hitv": round(kv / n, 4) if n else None, "hitv_ci": wilson(kv, n),
                 "maxup_mean": mean("maxup"), "r20_mean": mean("r20"), "r20_med": med("r20")}
 
     bands = [("70+", 70, 101), ("50~70", 50, 70), ("30~50", 30, 50), ("0~30", 0, 30)]
@@ -132,14 +137,15 @@ def compute():
         a = [o for o in smp if o["score"] >= 70]
         b = [o for o in smp if o["score"] < 50]
         if a and b:
-            diffs.append(sum(o["maxup"] >= HIT for o in a) / len(a) - sum(o["maxup"] >= HIT for o in b) / len(b))
+            diffs.append(sum(o["hitv"] for o in a) / len(a) - sum(o["hitv"] for o in b) / len(b))
     diffs.sort()
     ci = [round(diffs[int(.025 * len(diffs))], 4), round(diffs[int(.975 * len(diffs))], 4)] if diffs else None
     return {"generated": datetime.now(KST).isoformat(timespec="seconds"),
             "dates": len(ds), "tickers": len({o["t"] for o in rows}), "obs": len(rows),
             "period": [min(ds), max(ds)], "hit_def": f"이후 {HORIZON}거래일 최고가 +{int(HIT*100)}% 이상",
             "lag": LAG, "weights": W, "all": summ(rows), "bands": res, "deciles": deciles,
-            "diff_70_vs_50": {"est": round(res["70+"]["hit"] - summ([o for o in rows if o["score"] < 50])["hit"], 4)
+            "hitv_def": f"이후 {HORIZON}거래일 최대 상승폭이 그 종목 평소 변동성(60일)의 {ZV:g}배 이상",
+            "diff_70_vs_50": {"est": round(res["70+"]["hitv"] - summ([o for o in rows if o["score"] < 50])["hitv"], 4)
                               if res["70+"]["n"] else None, "ci95": ci}}
 
 
