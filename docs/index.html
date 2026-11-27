@@ -52,6 +52,11 @@ details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:cen
 details.fold>summary::-webkit-details-marker{display:none}
 details.fold .fa{margin-left:auto;color:var(--sub);transition:transform .15s}
 details.fold:not([open]) .fa{transform:rotate(-90deg)}
+.sqinfo{margin:12px 0 6px;padding:12px;border:1px solid #333;border-radius:8px;font-size:13.5px;line-height:1.65;color:#cfcfcf}
+.sqinfo>b{display:block;color:var(--amber);font-size:14.5px;margin-bottom:4px}
+.sqband{display:flex;flex-direction:column;gap:3px;margin:8px 0;font-size:12.5px}
+.sqband i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.sqnote{font-size:12px;color:var(--sub)}
 .sqr{padding:12px 0;border-bottom:1px solid var(--line)}
 .sqh{display:flex;align-items:center;gap:8px}
 .sqn{font:12px var(--mono);color:var(--sub);width:22px}
@@ -538,14 +543,22 @@ function sqHtml(){
   if(st.sub === "find"){ const q = st.q.trim().toUpperCase(); rows = q ? SQ.rows.filter(r => r.t.includes(q) || (r.name||"").toUpperCase().includes(q)) : []; }
   const sub = (k, l) => `<button class="tab ${st.sub===k?"on":""}" data-sqsub="${k}">${l}</button>`;
   return `
-  <div class="hdesc" style="margin:8px 0;line-height:1.7">공매도 잔고 기준일 <b style="color:var(--ink)">${esc(SQ.si_date)}</b> · 일별 공매도 ${esc((SQ.regsho_date||"").replace(/(\d{4})(\d\d)(\d\d)/,"$1-$2-$3"))} · 계산 ${fmtTime(SQ.generated)}<br>
-  공매도 잔고는 월 2회만 공개됩니다. 점수(0~100)는 숏커버 일수·잔고 증감·공매도 비중·거래량·주가·Reddit을 합친 <b style="color:var(--amber)">상대 순위</b>입니다. 유통주식수·대차 수수료는 미수집.</div>
+  <div class="sqinfo">
+    <b>스퀴즈 점수가 높다는 것은</b>
+    공매도 물량이 많이 쌓여 있고(숏커버 일수 길고 잔고 증가), 최근 공매도 압력이 크며, 동시에 거래량·주가·Reddit 관심이 붙기 시작한 종목이라는 뜻입니다.
+    이런 종목은 호재나 급등이 나오면 공매도 투자자들이 손실을 줄이려 주식을 되사면서(숏커버) 상승이 더 커질 수 있습니다.
+    <div class="sqband"><span><i style="background:#ff5f56"></i>70 이상 · 숏스퀴즈 조건이 여러 개 겹침</span><span><i style="background:#ffb000"></i>50~70 · 일부 조건 충족, 관찰 대상</span><span><i style="background:#555"></i>50 미만 · 특이 신호 적음</span></div>
+    <div class="sqnote">점수는 전체 후보 종목 안에서의 상대 순위이며 상승 확률이 아닙니다. 공매도가 많다는 것은 하락에 베팅한 근거가 있다는 뜻이기도 하므로, 신호 태그와 차트를 함께 확인하세요.</div>
+  </div>
   <div class="tabs" style="padding:0">${sub("rank","순위")}${sub("si","잔고")}${sub("sig","신호")}${sub("find","검색")}</div>
   ${st.sub === "find" ? `<input id="sqq" value="${esc(st.q)}" placeholder="티커 또는 회사명 (예: GME)" style="width:100%;margin:12px 0;padding:12px;border-radius:6px;border:1px solid #333;background:var(--panel);color:var(--ink);font-size:16px">`
    : `<div class="sqf"><span>거래대금</span>${btn("dv",0,"제한 없음")}${btn("dv",1e6,"일 100만$↑")}${btn("dv",5e6,"일 500만$↑")}${btn("dv",2e7,"일 2천만$↑")}</div>
       <div class="sqf"><span>잔고 금액</span>${btn("sv",0,"전체")}${btn("sv",1e7,"1천만$↑")}${btn("sv",1e8,"1억$↑")}${btn("sv",1e9,"10억$↑")}</div>`}
   <div class="hdesc" style="margin:6px 0">${rows.length}종목</div>
-  ${rows.slice(0, 60).map(sqRow).join("") || `<div class="empty">${st.sub==="find" ? "검색어를 입력하세요" : "조건에 맞는 종목이 없습니다"}</div>`}`;
+  ${rows.slice(0, 60).map(sqRow).join("") || `<div class="empty">${st.sub==="find" ? "검색어를 입력하세요" : "조건에 맞는 종목이 없습니다"}</div>`}
+  <div class="sec">── 데이터 기준</div>
+  <div class="hdesc" style="margin:10px 0 0;line-height:1.7">공매도 잔고 기준일 <b style="color:var(--ink)">${esc(SQ.si_date)}</b> · 일별 공매도 ${esc((SQ.regsho_date||"").replace(/(\d{4})(\d\d)(\d\d)/,"$1-$2-$3"))} · 계산 ${fmtTime(SQ.generated)}<br>
+  공매도 잔고는 월 2회만 공개됩니다. 점수(0~100)는 숏커버 일수·잔고 증감·공매도 비중·거래량·주가·Reddit을 합친 <b style="color:var(--amber)">상대 순위</b>입니다. 유통주식수·대차 수수료는 미수집.</div>`;
 }
 const PLAN = {
   rates: "FRED · Yahoo 데이터로 원/달러, 미 2년·10년, 국고채 3년, 장단기 금리차 추이를 보여줍니다.",
@@ -896,7 +909,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795764013";
+const APP_VERSION = "1795764799";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
