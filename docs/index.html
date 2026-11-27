@@ -356,10 +356,11 @@ function svSync(){ let ch = false;
   if(RP) for(const x of RP.items || []) if(rpSaved.has(x.id)){ const k = "k:" + x.id; if(JSON.stringify(Object.assign({}, svItems[k], {savedAt:0})) !== JSON.stringify(Object.assign({}, x, {savedAt:0}))){ svItems[k] = Object.assign({}, x, {savedAt: svItems[k] && svItems[k].savedAt || Date.now()}); ch = true; } }
   for(const id of rpSaved) if(!svItems["k:" + id] && RP){ rpSaved.delete(id); ch = true; }
   if(ch){ store.set("svItems", svItems); store.set("rpSaved", [...rpSaved]); } }
-async function loadRP(){
+let rpLoading = false;
+async function loadRP(){ if(rpLoading) return; rpLoading = true;
   try{ const r = await fetch("reports.json?t=" + Date.now(), {cache:"no-store"}); RP = r.ok ? await r.json() : {items:[]}; }catch(e){ RP = {items:[]}; }
   svSync();
-  if(state.tab === "report") render();
+  if(state.tab === "report" || state.tab === "home") render();
 }
 function rpItem(x){
   const rd = rpRead.has(x.id), sv = rpSaved.has(x.id);
@@ -517,7 +518,38 @@ const HOME_SECTIONS = [
     ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏커버 일수 · 스퀴즈 점수"],
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
-const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1, fg: 1};
+const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1, fg: 1, reddit: 1};
+let watch = store.get("watch", []), wq = "", wOpen = null;
+function watchHtml(){
+  if(!KR){ loadKR(); return `<div class="hdesc" style="margin:10px 0">불러오는 중…</div>`; }
+  if(!DART) loadDart(); if(!RP) loadRP();
+  const st = {}; (KR.stocks || []).forEach(y => st[y[0]] = y);
+  const rows = watch.map(c => st[c]).filter(Boolean).map(y => {
+    const ds = DART ? DART.items.filter(x => x.code === y[0]) : [], rs = RP ? (RP.items || []).filter(x => (x.target || "").includes(y[1]) || (x.title || "").includes(y[1])) : [];
+    const open = wOpen === y[0];
+    return `<div style="border-bottom:1px solid var(--line)"><div data-wopen="${y[0]}" style="display:flex;align-items:center;gap:8px;padding:9px 0;cursor:pointer">
+      <div style="flex:1;min-width:0"><b>${esc(y[1])}</b> <span style="color:var(--sub);font-size:11.5px">${y[0]} · ${esc(SEC2GRP[y[5]] || y[5] || "")}</span>
+      <div style="font-size:11.5px;color:var(--sub);margin-top:2px">${ds.length ? `<span style="color:var(--amber)">공시 ${ds.length}</span> · ` : ""}${rs.length ? `<span style="color:var(--amber)">리포트 ${rs.length}</span> · ` : ""}시총 ${y[3] >= 10000 ? (y[3] / 10000).toFixed(1) + "조" : Math.round(y[3]).toLocaleString() + "억"}</div></div>
+      <b style="color:${fcol(y[2])}">${sgnp(y[2])}</b><button class="rpb" data-wdel="${y[0]}" aria-label="삭제" style="width:28px;height:28px;font-size:13px">✕</button></div>
+      ${open ? `<div style="padding:0 0 10px 8px;border-left:2px solid var(--amber);margin-bottom:8px">
+        ${ds.slice(0, 6).map(x => `<a data-dart="${x.rno}" href="#" style="display:block;font-size:12.5px;color:var(--ink);text-decoration:none;padding:3px 0">📄 ${x.dt.slice(4,6)}/${x.dt.slice(6)} ${esc(x.nm)}${dartSummary(x) ? ` <span style="color:var(--sub)">· ${dartSummary(x)}</span>` : ""}</a>`).join("") || `<div class="hdesc">최근 30일 주요 공시 없음</div>`}
+        ${rs.slice(0, 5).map(x => `<div data-rp="${x.id}" style="font-size:12.5px;padding:3px 0;cursor:pointer">📑 ${esc(x.broker || "")} · ${esc(x.title || "")}</div>`).join("")}
+        <a href="https://m.stock.naver.com/domestic/stock/${y[0]}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--sub)">네이버 종목 화면 ›</a></div>` : ""}</div>`;
+  }).join("");
+  const q = wq.trim().toLowerCase(), sug = q ? (KR.stocks || []).filter(y => y[1].toLowerCase().includes(q) || y[0].includes(q)).slice(0, 6) : [];
+  return `<div style="position:relative;margin:10px 0 4px"><input id="wq" value="${esc(wq)}" placeholder="종목명 · 코드로 추가" style="width:100%;padding:10px;border-radius:6px;border:1px solid #333;background:var(--bg);color:var(--ink);font-size:15px">
+    <div id="wsug">${wsugHtml(sug)}</div></div>
+    ${rows || `<div class="hdesc" style="margin:8px 0">관심 종목을 추가하면 등락률 · 최근 공시 · 관련 리포트를 한 번에 봅니다.</div>`}
+    <div class="hdesc" style="margin:8px 0">이 기기에 저장 · 스크리너(주봉 RSI·캔들·실적 조건)는 다음 단계</div>`;
+}
+function wsugHtml(sug){ return sug.map(y => `<div data-wadd="${y[0]}" style="display:flex;gap:8px;padding:8px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13.5px"><span style="flex:1">${esc(y[1])} <span style="color:var(--sub);font-size:11.5px">${y[0]} · ${y[4] === "K" ? "KOSPI" : "KOSDAQ"}</span></span><span style="color:var(--amber)">＋ 추가</span></div>`).join(""); }
+document.addEventListener("input", e => { if(e.target.id === "wq"){ wq = e.target.value; const q = wq.trim().toLowerCase();
+  $("#wsug").innerHTML = wsugHtml(q && KR ? (KR.stocks || []).filter(y => y[1].toLowerCase().includes(q) || y[0].includes(q)).slice(0, 6) : []); } });
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-wadd]"); if(a){ if(!watch.includes(a.dataset.wadd)) watch.push(a.dataset.wadd); store.set("watch", watch); wq = ""; render(); return; }
+  const d = e.target.closest("[data-wdel]"); if(d){ e.stopPropagation(); watch = watch.filter(c => c !== d.dataset.wdel); store.set("watch", watch); render(); return; }
+  const o = e.target.closest("[data-wopen]"); if(o){ wOpen = wOpen === o.dataset.wopen ? null : o.dataset.wopen; render(); }
+});
 function dashHtml(){
   if(!KR){ loadKR(); } if(!RT){ loadRT(); }
   if(!KR) return `<div class="hdesc" style="margin:10px 0">불러오는 중…</div>`;
@@ -543,7 +575,7 @@ function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
   const fold = Object.assign({macro: true, kr: true, us: true}, store.get("fold", {}));
   const box = (id, t, body) => `<details class="fold" id="sec-${id}" data-fold="${id}" ${fold[id] ? "" : "open"}><summary class="sec">── ${t} <span class="fa">▾</span></summary>${body}</details>`;
-  const soon = `<div class="linkcard" style="display:block;color:var(--sub);font-size:13px">관심 종목 시세 · 스크리너 · DART 공시 · 관심 종목 리포트<br>→ 키 등록 후 활성화 예정</div>`;
+  const soon = watchHtml();
   const rows = latest.map(p => {
     const line = p.ai && p.ai.key ? "AI› " + p.ai.key.replace(/^🔑\s*/,"") : p.text.split("\n").find(l=>l.trim()) || "";
     const isNew = p.id > (seen[p.channel] || 0);
@@ -785,7 +817,8 @@ function secListHtml(tab){
   }).join("");
 }
 let DART = null, dartQ = "";
-async function loadDart(){ try{ const r = await fetch("dart.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ DART = await r.json(); if(state.win === "pg") render(); } }catch(e){} }
+let dartLoading = false;
+async function loadDart(){ if(dartLoading) return; dartLoading = true; try{ const r = await fetch("dart.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ DART = await r.json(); if(state.win === "pg" || state.tab === "home") render(); } }catch(e){} }
 const DART_TAG = n => /취득신탁/.test(n) ? ["신탁취득","g"] : /소각/.test(n) ? ["소각","g"] : /처분/.test(n) ? ["처분","r"] : /자기주식취득|자기주식 취득/.test(n) ? ["취득","g"]
   : /유상증자/.test(n) ? ["유상증자","r"] : /전환가액/.test(n) ? ["리픽싱","r"] : /전환사채/.test(n) ? ["CB","r"] : /신주인수권/.test(n) ? ["BW","r"] : /교환사채/.test(n) ? ["EB","r"]
   : /대량보유/.test(n) ? ["5%보유",""] : /임원/.test(n) ? ["임원·주요주주",""] : /잠정/.test(n) ? ["잠정실적",""] : ["공시",""];
@@ -855,7 +888,8 @@ document.addEventListener("click", e => { const a = e.target.closest("[data-dart
 let dartBack = null;
 document.addEventListener("input", e => { if(e.target.id === "dartq"){ dartQ = e.target.value; const l = $("#dartlist"); if(l) l.innerHTML = dartListHtml(pgId); } });
 let KR = null, heatSel = null, heatSort = "mv";
-async function loadKR(){ try{ const r = await fetch("krmkt.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ KR = await r.json(); if(state.win === "pg" || state.tab === "home") render(); } }catch(e){} }
+let krLoading = false;
+async function loadKR(){ if(krLoading) return; krLoading = true; try{ const r = await fetch("krmkt.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ KR = await r.json(); if(state.win === "pg" || state.tab === "home") render(); } }catch(e){} }
 const kcol = c => { if(c == null) return "#222"; const a = Math.min(Math.abs(c) / 4, 1); return c > 0 ? `rgba(229,57,53,${0.18 + a * 0.72})` : c < 0 ? `rgba(30,136,229,${0.18 + a * 0.72})` : "#2a2a2a"; };
 const sgnp = v => v == null ? "-" : (v > 0 ? "+" : "") + v.toFixed(2) + "%";
 const eok = v => v == null ? "-" : (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR") + "억";
@@ -970,7 +1004,8 @@ function spark(hist, w = 120, h = 34){
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.6"/></svg>`;
 }
 let RT = null;
-async function loadRT(){ try{ const r = await fetch("rates.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ RT = await r.json(); if(state.win === "pg" || state.tab === "home") render(); } }catch(e){} }
+let rtLoading = false;
+async function loadRT(){ if(rtLoading) return; rtLoading = true; try{ const r = await fetch("rates.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ RT = await r.json(); if(state.win === "pg" || state.tab === "home") render(); } }catch(e){} }
 function ratesHtml(){
   if(!RT){ loadRT(); return `<div class="empty">불러오는 중…</div>`; }
   const row = x => { const bond = x.cat === "bond";
@@ -1045,7 +1080,23 @@ function fgHtml(){
       <div style="height:6px;background:#222;border-radius:3px;margin:6px 0 4px"><div style="height:100%;width:${p.score}%;background:${fgCol(p.score)};border-radius:3px"></div></div><div class="hdesc">${esc(p.desc)}</div></div>`).join("")}
     <div class="hdesc" style="margin:12px 0">각 요소를 최근 약 1년 분포 안의 백분위로 바꿔 평균한 값 · 25 미만 극단적 공포, 75 이상 극단적 탐욕 · 수석님 8개 지표 방식은 지표 구성을 받으면 그대로 바꿔 넣을 수 있음 · 미국 CNN 지수는 수집 서버 접속이 차단돼 미포함</div>`;
 }
+let RD = null, SQ2 = null;
+async function loadRD(){ try{ const [a, b] = await Promise.all([fetch("reddit.json?t=" + Date.now(), {cache:"no-store"}), fetch("squeeze.json", {cache:"no-store"})]);
+  if(a.ok) RD = await a.json(); if(b.ok) SQ2 = await b.json(); if(state.win === "pg") render(); }catch(e){ RD = {rows: []}; } }
+function redditHtml(){
+  if(!RD){ loadRD(); return `<div class="empty">불러오는 중…</div>`; }
+  const sq = {}; ((SQ2 || {}).rows || []).forEach(r => sq[r.t] = r.score);
+  return `<div class="hdesc" style="margin:12px 0 6px">Reddit 주식 커뮤니티 24시간 언급 순위 · ${esc((RD.generated || "").slice(5, 16).replace("T", " "))} 기준</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="color:var(--sub);font-size:11.5px"><td>순위</td><td>종목</td><td style="text-align:right">언급</td><td style="text-align:right">24h 전</td><td style="text-align:right">스퀴즈</td></tr>
+    ${(RD.rows || []).slice(0, 100).map(r => { const dr = r.rank24 ? r.rank24 - r.rank : null, gm = r.m24 ? (r.m / r.m24 - 1) * 100 : null;
+      return `<tr style="border-top:1px solid var(--line)"><td style="padding:7px 0;white-space:nowrap">${r.rank}${dr ? ` <span style="font-size:11px;color:${dr > 0 ? "#f87171" : "#60a5fa"}">${dr > 0 ? "▲" : "▼"}${Math.abs(dr)}</span>` : r.rank24 ? "" : ` <span style="font-size:11px;color:var(--amber)">NEW</span>`}</td>
+      <td><b>${esc(r.t)}</b><div style="font-size:11px;color:var(--sub);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.n)}</div></td>
+      <td style="text-align:right">${r.m.toLocaleString()}${gm != null && Math.abs(gm) >= 50 ? `<div style="font-size:11px;color:${gm > 0 ? "#f87171" : "#60a5fa"}">${gm > 0 ? "+" : ""}${gm.toFixed(0)}%</div>` : ""}</td>
+      <td style="text-align:right;color:var(--sub)">${r.m24.toLocaleString()}</td><td style="text-align:right">${sq[r.t] != null ? `<span data-sqt="${esc(r.t)}" style="color:${sq[r.t] >= 70 ? "var(--amber)" : "var(--sub)"};cursor:pointer">${sq[r.t].toFixed(0)}</span>` : "-"}</td></tr>`; }).join("")}</table>
+    <div class="hdesc" style="margin:10px 0">출처 ApeWisdom (r/wallstreetbets 등) · 언급 ±50% 이상 변화만 표시 · 스퀴즈 점수는 SHORT SQUEEZE US 기준</div>`;
+}
 function pageHtml(){
+  if(pgId === "reddit"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + redditHtml(); }
   if(pgId === "fg"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + fgHtml(); }
   if(pgId === "rates"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + ratesHtml(); }
   if(pgId === "heat" || pgId === "flow"){ const w = WHEN[pgId] || [];
@@ -1309,7 +1360,7 @@ $("#feed").addEventListener("click", e => {
   if(pgb){ const id = pgb.dataset.pg;
     if(pgb.dataset.ptab){ state.tab = pgb.dataset.ptab; store.set("tab2", state.tab); scrollTo(0,0); }  // 홈에서 누르면 해당 탭으로 이동 후 창 열기
     pgFrom = state.tab; if(LIVE[id] !== "sq") pgId = id; openWin(LIVE[id] === "sq" ? "sq" : "pg"); return; }
-  if(e.target.closest("[data-wclose]") && state.win === "dd" && dartBack){ const [pg, y] = dartBack; dartBack = null; pgId = pg; openWin("pg", y); return; }
+  if(e.target.closest("[data-wclose]") && state.win === "dd" && dartBack){ const [pg, y] = dartBack; dartBack = null; if(!pg){ state.win = null; render(false); return; } pgId = pg; openWin("pg", y); return; }
   if(e.target.closest("[data-wclose]")){ state.win = null; render(false); return; }
   const bk = e.target.closest("[data-back]");
   if(bk){ state.tab = bk.dataset.back; store.set("tab2", state.tab); render(); scrollTo(0,0); return; }
@@ -1366,7 +1417,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795781604";
+const APP_VERSION = "1795782338";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
