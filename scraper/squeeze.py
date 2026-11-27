@@ -10,7 +10,9 @@ OUT = Path(__file__).resolve().parent.parent / "docs" / "squeeze.json"
 KST = timezone(timedelta(hours=9))
 UA = {"User-Agent": "Mozilla/5.0 (JPView personal dashboard)"}
 REFRESH_HOURS = 6
-N_PRICE = 250            # Yahoo 일봉을 받을 후보 수
+PX_CACHE = Path(__file__).resolve().parent.parent / "data" / "sq" / "px"
+PX_BUDGET = 700          # 한 번 실행에 새로 받는 일봉 수 (나머지는 캐시 사용, 순차 갱신)
+PX_FRESH_H = 30          # 이 시간 안의 캐시는 그대로 사용
 W = {"dtc": .25, "sichg": .20, "svr": .15, "surge": .15, "mom": .10, "reddit": .10, "sival": .05}
 
 
@@ -129,19 +131,28 @@ def build():
         for b, p in zip(base, pct_rank([b[k] for b in base])):
             b["_" + k] = p or 0
     base.sort(key=lambda b: b["_dtc"] * .5 + b["_sichg"] * .3 + b["_svr"] * .2, reverse=True)
-    cand = base[:N_PRICE]
-    for t in rd:  # Reddit 상위 종목은 추가로 포함
-        hit = next((b for b in base if b["t"] == t), None)
-        if hit and hit not in cand:
-            cand.append(hit)
-    rows = []
-    for b in cand:
+    cand = base   # 조건을 만족하는 전 종목 (가격은 캐시로 순차 갱신)
+    PX_CACHE.mkdir(parents=True, exist_ok=True)
+    now = time.time()
+    def cache_age(t):
+        f = PX_CACHE / f"{t}.json"
+        return (now - f.stat().st_mtime) / 3600 if f.exists() else 1e9
+    stale = [b["t"] for b in cand if cache_age(b["t"]) > PX_FRESH_H]
+    stale.sort(key=lambda t: (cache_age(t) < 1e9, -cache_age(t)))   # 처음 보는 종목 → 오래된 순
+    for t in stale[:PX_BUDGET]:
         try:
-            y = yahoo(b["t"])
+            y = yahoo(t)
         except Exception:
             y = None
-        time.sleep(.15)
-        if not y or y.get("itype") not in ("EQUITY", None):
+        (PX_CACHE / f"{t}.json").write_text(json.dumps(y or {"none": True}))
+        time.sleep(.1)
+    rows = []
+    for b in cand:
+        f = PX_CACHE / f"{b['t']}.json"
+        if not f.exists():
+            continue
+        y = json.loads(f.read_text())
+        if not y or y.get("none") or y.get("itype") not in ("EQUITY", None):
             continue
         nm = (y.get("name") or b.get("issue") or "").lower()
         if any(w in nm for w in (" fund", "municipal", " etf", "autocallable", "income trust", " etn", "closed-end")):
@@ -169,7 +180,7 @@ def build():
     keep = ["t", "name", "issue", "price", "ret1", "ret5", "dv20", "surge", "si", "si_prev", "sichg", "dtc", "svr",
             "sival", "reddit", "reddit_prev", "score", "signals", "vol", "volp"]
     return {"generated": datetime.now(KST).isoformat(timespec="seconds"), "si_date": si_date,
-            "regsho_date": sho_date, "count": len(rows),
+            "regsho_date": sho_date, "count": len(rows), "universe": len(base),
             "rows": [{k: (round(r[k], 4) if isinstance(r.get(k), float) else r.get(k)) for k in keep} for r in rows]}
 
 
@@ -253,6 +264,7 @@ def run():
     except Exception as e:
         print(f"[SQUEEZE] 이력 계산 실패: {e}", file=sys.stderr)
     OUT.write_text(json.dumps(data, ensure_ascii=False))
+    print(f"[SQUEEZE] 후보 전체 {data.get('universe')} / 가격 확보 {data['count']}")
     print(f"[SQUEEZE] {data['count']}종목, 잔고 기준일 {data['si_date']}, 일별 {data['regsho_date']}")
 
 
