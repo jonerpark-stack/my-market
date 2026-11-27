@@ -2,7 +2,7 @@
 출처: FINRA 공매도 잔고(API), FINRA Reg SHO 일별 공매도 거래량, Yahoo 일봉, ApeWisdom(Reddit 언급).
 GitHub Actions에서 fetch.py 실행 뒤 호출되며, 6시간에 한 번만 다시 계산한다.
 """
-import json, math, time, urllib.request
+import json, math, time, urllib.error, urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -23,8 +23,19 @@ def _get(url, data=None, headers=None, timeout=40):
 def finra_si():
     api = "https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest"
     h = {"Content-Type": "application/json", "Accept": "application/json"}
-    last = json.loads(_get(api, json.dumps({"limit": 1, "sortFields": ["-settlementDate"]}).encode(), h))
-    date = last[0]["settlementDate"]
+    date = None
+    for back in range(0, 45):  # 최근 결제기준일 찾기 (월 2회)
+        d = (datetime.now(KST).date() - timedelta(days=back)).isoformat()
+        body = {"limit": 1, "compareFilters": [{"compareType": "EQUAL", "fieldName": "settlementDate", "fieldValue": d}]}
+        try:
+            if json.loads(_get(api, json.dumps(body).encode(), h) or b"[]"):
+                date = d
+                break
+        except urllib.error.HTTPError as e:
+            print("[SQUEEZE] FINRA 응답:", e.code, e.read()[:300])
+            raise
+    if not date:
+        raise RuntimeError("FINRA 공매도 잔고 기준일을 찾지 못함")
     rows, off = [], 0
     while True:
         body = {"limit": 5000, "offset": off,
