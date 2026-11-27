@@ -23,7 +23,7 @@ def get(params, ep="list"):
             print("[DART] 재시도", e); time.sleep(2 + i * 3)
     return {}
 
-DET_BUDGET = 300
+DET_BUDGET = 150
 SKIP = {"rcept_no", "rcept_dt", "corp_code", "corp_name", "corp_cls", "status", "message"}
 def ep_of(nm):
     n = nm.replace(" ", "")
