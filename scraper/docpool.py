@@ -9,7 +9,7 @@ from pathlib import Path
 OUT = Path(__file__).resolve().parent.parent / "docs" / "reports.json"
 KST = timezone(timedelta(hours=9))
 CHANNEL = "DOC_POOL"
-KEEP_DAYS = 183
+KEEP_DAYS = 92
 FIRST_LIMIT = 400
 SECTORS = ["반도체", "IT하드웨어·디스플레이", "2차전지", "자동차·부품", "조선·기계", "방산·우주", "전력·에너지·유틸리티",
            "건설·건자재", "화학·정유", "철강·소재", "금융·보험", "인터넷·게임·소프트웨어", "미디어·엔터", "통신",
