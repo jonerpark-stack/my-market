@@ -517,7 +517,7 @@ const HOME_SECTIONS = [
     ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏커버 일수 · 스퀴즈 점수"],
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
-const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1};
+const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1};
 function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
   const fold = Object.assign({macro: true, kr: true, us: true}, store.get("fold", {}));
@@ -833,7 +833,55 @@ function dartDetailHtml(){
 document.addEventListener("click", e => { const a = e.target.closest("[data-dart]"); if(!a) return; e.preventDefault(); dartSel = a.dataset.dart; dartBack = [pgId, $("#winbody") ? $("#winbody").scrollTop : 0]; openWin("dd"); }, true);
 let dartBack = null;
 document.addEventListener("input", e => { if(e.target.id === "dartq"){ dartQ = e.target.value; const l = $("#dartlist"); if(l) l.innerHTML = dartListHtml(pgId); } });
+let KR = null, heatSel = null, heatSort = "mv";
+async function loadKR(){ try{ const r = await fetch("krmkt.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ KR = await r.json(); if(state.win === "pg") render(); } }catch(e){} }
+const kcol = c => { if(c == null) return "#222"; const a = Math.min(Math.abs(c) / 4, 1); return c > 0 ? `rgba(229,57,53,${0.18 + a * 0.72})` : c < 0 ? `rgba(30,136,229,${0.18 + a * 0.72})` : "#2a2a2a"; };
+const sgnp = v => v == null ? "-" : (v > 0 ? "+" : "") + v.toFixed(2) + "%";
+const eok = v => v == null ? "-" : (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR") + "억";
+const fcol = v => v > 0 ? "#f87171" : v < 0 ? "#60a5fa" : "var(--sub)";
+function heatHtml(){
+  if(!KR){ loadKR(); return `<div class="empty">불러오는 중…</div>`; }
+  const ss = [...(KR.sectors || [])].sort(heatSort === "mv" ? (a, b) => (b.mv || 0) - (a.mv || 0) : (a, b) => (b.chg || 0) - (a.chg || 0));
+  const top = ss.map(x => x.mv || 0).sort((a, b) => b - a)[7] || 0;
+  const idx = Object.entries(KR.idx || {}).map(([m, v]) => `<span style="margin-right:14px"><b>${m}</b> ${esc(v.price || "")} <span style="color:${fcol(+v.chg)}">${sgnp(+v.chg)}</span></span>`).join("");
+  let h = `<div style="margin:12px 0 6px;font-size:13.5px">${idx}</div>
+    <div style="display:flex;gap:6px;margin:8px 0"><button class="act" data-hsort="mv" style="${heatSort === "mv" ? "color:var(--amber);border-color:var(--amber)" : ""}">시총순</button><button class="act" data-hsort="chg" style="${heatSort === "chg" ? "color:var(--amber);border-color:var(--amber)" : ""}">등락순</button>
+    <span class="hdesc" style="margin-left:auto;align-self:center">${esc((KR.generated || "").slice(11, 16))} 기준</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">`;
+  for(const x of ss){
+    const big = heatSort === "mv" && (x.mv || 0) >= top && top > 0;
+    h += `<div data-heat="${x.no}" style="grid-column:span ${big ? 2 : 1};background:${kcol(x.chg)};border-radius:4px;padding:${big ? "12px 8px" : "8px 5px"};cursor:pointer;min-height:${big ? 62 : 48}px;${heatSel === x.no ? "outline:2px solid var(--amber)" : ""}">
+      <div style="font-size:${big ? 13.5 : 11.5}px;font-weight:700;line-height:1.25;word-break:keep-all">${esc(x.name)}</div>
+      <div style="font-size:${big ? 13 : 11.5}px;margin-top:3px">${sgnp(x.chg)}</div></div>`;
+    if(heatSel === x.no) h += `<div style="grid-column:1/-1;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:2px 0 6px">
+      <div class="hdesc" style="margin-bottom:6px">${esc(x.name)} · ${x.n || "?"}종목 · 상승 ${x.up ?? "-"} / 하락 ${x.dn ?? "-"}</div>
+      ${(x.stocks || []).map(y => `<div style="display:flex;padding:5px 0;border-bottom:1px solid var(--line);font-size:13.5px"><span style="flex:1">${esc(y.n)} <span style="color:var(--sub);font-size:11.5px">${esc(y.c)}</span></span><span style="color:${fcol(y.chg)}">${sgnp(y.chg)}</span></div>`).join("") || `<div class="hdesc">종목 정보를 받아오는 중입니다.</div>`}</div>`;
+  }
+  return h + `</div><div class="hdesc" style="margin:10px 0">빨강 상승 · 파랑 하락, 진할수록 등락폭 큼(±4% 이상 최대) · 칸을 누르면 시총 상위 종목 · 네이버 업종 분류 기준</div>`;
+}
+function flowHtml(){
+  if(!KR){ loadKR(); return `<div class="empty">불러오는 중…</div>`; }
+  let h = "";
+  for(const [m, v] of Object.entries(KR.idx || {})){
+    const tot = (v.up || 0) + (v.dn || 0) + (v.flat || 0), ur = tot ? (v.up / tot * 100) : 0;
+    h += `<div class="sec" style="margin-top:14px">── ${m} <span style="color:var(--sub);font-weight:400">${esc(v.price || "")}</span> <span style="color:${fcol(+v.chg)}">${sgnp(+v.chg)}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;font-size:13px">
+      ${[["개인", v.ind], ["외국인", v.frg], ["기관", v.ins], ["프로그램", v.prog]].map(([k, x]) => `<div style="border:1px solid var(--line);border-radius:6px;padding:8px 2px"><div style="color:var(--sub);font-size:11.5px">${k}</div><div style="color:${fcol(x)};font-weight:700;margin-top:3px">${eok(x)}</div></div>`).join("")}</div>
+      <div style="margin:10px 0 4px;font-size:12.5px;color:var(--sub)">상승 ${v.up ?? "-"}${v.upper ? ` (상한 ${v.upper})` : ""} · 하락 ${v.dn ?? "-"}${v.lower ? ` (하한 ${v.lower})` : ""} · 보합 ${v.flat ?? "-"}</div>
+      <div style="height:8px;border-radius:4px;background:#1e88e5;overflow:hidden"><div style="height:100%;width:${ur.toFixed(1)}%;background:#e53935"></div></div>`;
+    const hs = (KR.hist || {})[m] || [];
+    if(hs.length) h += `<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px"><tr style="color:var(--sub)"><td>일자</td><td style="text-align:right">개인</td><td style="text-align:right">외국인</td><td style="text-align:right">기관</td></tr>
+      ${hs.slice(0, 20).map(r => `<tr style="border-top:1px solid var(--line)"><td style="padding:5px 0">${r.d.slice(4,6)}/${r.d.slice(6)}</td>${[r.ind, r.frg, r.ins].map(x => `<td style="text-align:right;color:${fcol(x)}">${eok(x)}</td>`).join("")}</tr>`).join("")}</table>`;
+  }
+  return h + `<div class="hdesc" style="margin:12px 0">단위 억원 · 장중에는 잠정치 · 일별 기록은 오늘부터 쌓입니다 · 출처 네이버페이 증권</div>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-heat]"); if(t){ const n = +t.dataset.heat; heatSel = heatSel === n ? null : n; const y = $("#winbody").scrollTop; render(); $("#winbody").scrollTop = y; return; }
+  const so = e.target.closest("[data-hsort]"); if(so){ heatSort = so.dataset.hsort; heatSel = null; render(); }
+});
 function pageHtml(){
+  if(pgId === "heat" || pgId === "flow"){ const w = WHEN[pgId] || [];
+    return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + (pgId === "heat" ? heatHtml() : flowHtml()); }
   if(["insider","buyback","dilute","earn"].includes(pgId)){ const w = WHEN[pgId] || [];
     return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + dartHtml(pgId); }
   const all = HOME_SECTIONS.flatMap(x => x[2]);
@@ -1150,7 +1198,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795776542";
+const APP_VERSION = "1795776957";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
