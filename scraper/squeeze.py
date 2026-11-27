@@ -95,7 +95,9 @@ def yahoo(t):
         return None
     dv20 = sum(a * b for a, b in zip(c[-20:], v[-20:])) / 20
     v5, v60 = sum(v[-5:]) / 5, (sum(v[-60:]) / len(v[-60:])) or 1
-    return {"price": c[-1], "ret1": c[-1] / c[-2] - 1, "ret5": c[-1] / c[-6] - 1,
+    rets = [c[i] / c[i - 1] - 1 for i in range(max(1, len(c) - 60), len(c))]
+    vol = (sum(x * x for x in rets) / len(rets)) ** .5 if rets else None
+    return {"price": c[-1], "ret1": c[-1] / c[-2] - 1, "ret5": c[-1] / c[-6] - 1, "vol": vol,
             "dv20": dv20, "surge": v5 / v60, "name": r["meta"].get("longName") or r["meta"].get("shortName"),
             "itype": r["meta"].get("instrumentType")}
 
@@ -161,9 +163,11 @@ def build():
         if r["reddit"] >= 20 and r["reddit"] >= 2 * max(r["reddit_prev"], 1): sig.append("Reddit 언급 급증")
         if (r.get("svr") or 0) >= .6: sig.append(f"공매도 거래 비중 {r['svr']*100:.0f}%")
         r["signals"] = sig
+    for r, p in zip(rows, pct_rank([r.get("vol") for r in rows])):
+        r["volp"] = round(p or 0, 1)   # 변동성 백분위 (0~100)
     rows.sort(key=lambda r: r["score"], reverse=True)
     keep = ["t", "name", "issue", "price", "ret1", "ret5", "dv20", "surge", "si", "si_prev", "sichg", "dtc", "svr",
-            "sival", "reddit", "reddit_prev", "score", "signals"]
+            "sival", "reddit", "reddit_prev", "score", "signals", "vol", "volp"]
     return {"generated": datetime.now(KST).isoformat(timespec="seconds"), "si_date": si_date,
             "regsho_date": sho_date, "count": len(rows),
             "rows": [{k: (round(r[k], 4) if isinstance(r.get(k), float) else r.get(k)) for k in keep} for r in rows]}

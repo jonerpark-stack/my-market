@@ -432,7 +432,7 @@ function homeHtml(){
 }
 const REPORT_EXCLUDE = ["globalmktinsight", "ehdwl"];   // 리포트 탭에서 제외
 const INSITE = ["ehdwl"];                       // 텔레그램으로 넘기지 않고 사이트 안에서 본문 표시
-let SQ = null, sqState = Object.assign({sub:"rank", dv:5e6, sv:1e7, q:""}, store.get("sq", {}));
+let SQ = null, sqState = Object.assign({sub:"rank", dv:5e6, sv:1e7, vq:0, q:""}, store.get("sq", {}));
 const fmtUsd = v => v == null ? "-" : v >= 1e9 ? "$" + (v/1e9).toFixed(1) + "B" : v >= 1e6 ? "$" + (v/1e6).toFixed(1) + "M" : "$" + Math.round(v/1e3) + "K";
 const pctS = (v, d=1) => v == null ? "-" : (v >= 0 ? "▲" : "▼") + Math.abs(v*100).toFixed(d) + "%";
 async function loadSQ(){
@@ -556,7 +556,7 @@ function sqHtml(){
   if(!SQ){ loadSQ(); return `<div class="empty">불러오는 중…</div>`; }
   const st = sqState;
   const btn = (k, v, label) => `<button class="chip ${st[k]===v?"on":""}" data-sq="${k}" data-v="${v}">${label}</button>`;
-  let rows = SQ.rows.filter(r => r.dv20 >= st.dv && r.sival >= st.sv);
+  let rows = SQ.rows.filter(r => r.dv20 >= st.dv && r.sival >= st.sv && (r.volp == null || r.volp >= st.vq));
   if(st.sub === "si") rows = rows.slice().sort((a,b) => (b.sival||0) - (a.sival||0));
   if(st.sub === "sig") rows = rows.filter(r => (r.signals||[]).some(x => /급증|급등|잔고 \+/.test(x)));
   if(st.sub === "find"){ const q = st.q.trim().toUpperCase(); rows = q ? SQ.rows.filter(r => r.t.includes(q) || (r.name||"").toUpperCase().includes(q)) : []; }
@@ -566,12 +566,13 @@ function sqHtml(){
     <b>스퀴즈 점수가 높다는 것은</b>
     공매도 물량이 많이 쌓여 있고(숏커버 일수 길고 잔고 증가), 최근 공매도 압력이 크며, 동시에 거래량·주가·Reddit 관심이 붙기 시작한 종목이라는 뜻입니다.
     이런 종목은 호재나 급등이 나오면 공매도 투자자들이 손실을 줄이려 주식을 되사면서(숏커버) 상승이 더 커질 수 있습니다.
-    <div class="sqband"><span><i style="background:#ff5f56"></i>70 이상 · 숏스퀴즈 조건이 여러 개 겹침</span><span><i style="background:#ffb000"></i>50~70 · 일부 조건 충족, 관찰 대상</span><span><i style="background:#555"></i>50 미만 · 특이 신호 적음</span></div>
-    <div class="sqnote">점수는 전체 후보 종목 안에서의 상대 순위이며 상승 확률이 아닙니다. 공매도가 많다는 것은 하락에 베팅한 근거가 있다는 뜻이기도 하므로, 신호 태그와 차트를 함께 확인하세요.</div>
+    <div class="sqband"><span><i style="background:#ff5f56"></i>70 이상 · 과거 2년 검증에서 급등 빈도가 평균의 약 1.3배</span><span><i style="background:#ffb000"></i>50~70 · 평균보다 약간 높음</span><span><i style="background:#555"></i>50 미만 · 평균 이하</span></div>
+    <div class="sqnote"><b style="color:var(--amber)">변동성 상위 20%</b> 필터와 함께 쓰면 효과가 커짐: 과거 검증에서 이 그룹의 점수 상위 10% 종목은 20거래일 내 +30% 급등 비율이 21.6%(그룹 평균 16.4%), 변동성 대비 급등률은 10.5%(그룹 평균 5.5%)였음.<br>점수는 상대 순위이며 상승 확률이 아님. 공매도가 많다는 것은 하락 근거가 있다는 뜻이기도 하므로 신호 태그와 차트를 함께 확인</div>
   </div>
   <div class="tabs" style="padding:0">${sub("rank","순위")}${sub("si","잔고")}${sub("sig","신호")}${sub("find","검색")}</div>
   ${st.sub === "find" ? `<input id="sqq" value="${esc(st.q)}" placeholder="티커 또는 회사명 (예: GME)" style="width:100%;margin:12px 0;padding:12px;border-radius:6px;border:1px solid #333;background:var(--panel);color:var(--ink);font-size:16px">`
    : `<div class="sqf"><span>거래대금</span>${btn("dv",0,"제한 없음")}${btn("dv",1e6,"일 100만$↑")}${btn("dv",5e6,"일 500만$↑")}${btn("dv",2e7,"일 2천만$↑")}</div>
+      <div class="sqf"><span>변동성</span>${btn("vq",0,"전체")}${btn("vq",50,"상위 50%")}${btn("vq",80,"상위 20%")}</div>
       <div class="sqf"><span>잔고 금액</span>${btn("sv",0,"전체")}${btn("sv",1e7,"1천만$↑")}${btn("sv",1e8,"1억$↑")}${btn("sv",1e9,"10억$↑")}</div>`}
   <div class="hdesc" style="margin:6px 0">${rows.length}종목</div>
   ${rows.slice(0, 60).map(sqRow).join("") || `<div class="empty">${st.sub==="find" ? "검색어를 입력하세요" : "조건에 맞는 종목이 없습니다"}</div>`}
@@ -929,7 +930,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795766207";
+const APP_VERSION = "1795766678";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
