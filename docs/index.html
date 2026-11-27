@@ -762,7 +762,7 @@ function dartHtml(cat){
     const d = x.dt.slice(4,6) + "/" + x.dt.slice(6);
     if(d !== last){ h += `<div class="sec" style="margin-top:14px">── ${d}</div>`; last = d; }
     const [tg, c] = DART_TAG(x.nm), col = c === "g" ? "#4ade80" : c === "r" ? "#f87171" : "var(--amber)";
-    h += `<a href="https://m.dart.fss.or.kr/viewer/main.do?rcpNo=${x.rno}" target="_blank" rel="noopener" style="display:block;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none">
+    h += `<a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rno}" target="_blank" rel="noopener" style="display:block;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none">
       <div style="font-size:13px"><b>${esc(x.corp)}</b> <span style="color:var(--sub)">${x.code} · ${x.mkt}</span> <span style="color:${col};border:1px solid ${col};border-radius:4px;padding:0 5px;font-size:11.5px;margin-left:4px">${tg}</span></div>
       <div style="font-size:13px;color:var(--sub);margin-top:3px">${esc(x.nm)}${x.who && x.who !== x.corp ? " · " + esc(x.who) : ""}</div></a>`;
   }
@@ -1079,7 +1079,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795771130";
+const APP_VERSION = "1795771749";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
