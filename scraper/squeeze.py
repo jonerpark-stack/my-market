@@ -96,7 +96,8 @@ def yahoo(t):
     dv20 = sum(a * b for a, b in zip(c[-20:], v[-20:])) / 20
     v5, v60 = sum(v[-5:]) / 5, (sum(v[-60:]) / len(v[-60:])) or 1
     return {"price": c[-1], "ret1": c[-1] / c[-2] - 1, "ret5": c[-1] / c[-6] - 1,
-            "dv20": dv20, "surge": v5 / v60, "name": r["meta"].get("longName") or r["meta"].get("shortName")}
+            "dv20": dv20, "surge": v5 / v60, "name": r["meta"].get("longName") or r["meta"].get("shortName"),
+            "itype": r["meta"].get("instrumentType")}
 
 
 def pct_rank(vals):
@@ -138,7 +139,10 @@ def build():
         except Exception:
             y = None
         time.sleep(.15)
-        if not y:
+        if not y or y.get("itype") not in ("EQUITY", None):
+            continue
+        nm = (y.get("name") or b.get("issue") or "").lower()
+        if any(w in nm for w in (" fund", "municipal", " etf", "autocallable", "income trust", " etn", "closed-end")):
             continue
         m = rd.get(b["t"])
         b.update(y)

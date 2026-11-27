@@ -51,6 +51,22 @@ details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:cen
 details.fold>summary::-webkit-details-marker{display:none}
 details.fold .fa{margin-left:auto;color:var(--sub);transition:transform .15s}
 details.fold:not([open]) .fa{transform:rotate(-90deg)}
+.sqr{padding:12px 0;border-bottom:1px solid var(--line)}
+.sqh{display:flex;align-items:center;gap:8px}
+.sqn{font:12px var(--mono);color:var(--sub);width:22px}
+.sqt{font:800 15px var(--mono);color:var(--amber);text-decoration:none}
+.sqnm{flex:1;min-width:0;color:var(--sub);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sqs{font:800 16px var(--mono);color:var(--ink)}
+.sqbar{height:3px;background:#1d1d1d;margin:6px 0 8px}
+.sqbar i{display:block;height:100%;background:var(--amber)}
+.sqg{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:3px 10px;font-size:12px;color:var(--sub)}
+.sqg b{font:600 12.5px var(--mono);color:var(--ink);text-align:right}
+.sqg b.u{color:var(--up)} .sqg b.d{color:var(--down)}
+.sqsig{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.sqsig span{font-size:11px;border:1px solid #4a3a00;color:var(--amber);padding:1px 6px;border-radius:3px}
+.sqf{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.sqf>span{font-size:12px;color:var(--sub);width:62px}
+.sqf .chip{padding:5px 9px;font-size:12px}
 .hitem{padding:12px 0;border-bottom:1px solid var(--line)}
 .hname{font-weight:800;font-size:15px}
 .hdesc{color:var(--sub);font-size:13px;margin-top:2px}
@@ -301,21 +317,26 @@ function grouped(list, fn){
 const HOME_SECTIONS = [
   ["macro", "매크로 · 시장 개관", [
     ["tg", "텔레그램 시황", "증권사 시황 채널 5곳 최신 글 + AI 요약"],
+    ["rates", "금리 · 환율 보드", "원/달러 · 미 2Y/10Y · 국고채 3Y · 장단기 금리차"],
+    ["earn", "잠정실적 · 어닝 서프라이즈", "잠정실적 공시와 전년 대비 증감"],
     ["cal", "한미 이벤트 캘린더", "실적 발표 · FOMC · 금통위 · 휴장일 · 지수 변경"],
     ["heat", "한국 히트맵", "KOSPI · KOSDAQ 섹터별 등락"],
     ["fg", "공포 · 탐욕 지수", "미국 CNN F&G · 한국 과열도"]]],
   ["kr", "한국 수급", [
+    ["flow", "외국인 · 기관 수급", "시장 · 업종별 일별 순매수"],
     ["samo", "사모펀드 수급", "사모펀드 순매수 · 순매도 상위 종목"],
     ["credit", "신용 · 대차", "신용잔고 · 대차잔고 증감 상위"],
     ["insider", "내부자 매매", "임원 · 주요주주 장내 매수 · 매도"],
     ["buyback", "자사주", "자사주 취득 · 소각 · 처분 공시"],
+    ["dilute", "희석 경보판", "유상증자 · CB · BW 발행 공시"],
     ["rebal", "지수 정기변경", "KOSPI200 · KOSDAQ150 편입 · 편출 예상"]]],
   ["us", "미국 수급", [
     ["guru", "GURU 포트폴리오", "유명 투자자 13F · 정치인 매매 공시"],
     ["active", "US ACTIVE ETF", "ARK 등 액티브 ETF 일별 매매"],
-    ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏스퀴즈 후보"],
+    ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏커버 일수 · 스퀴즈 점수"],
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
+const LIVE = {tg: "telegram", squeeze: "sq"};
 function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
   const fold = store.get("fold", {});
@@ -329,20 +350,65 @@ function homeHtml(){
       <div class="body" style="${p.ai?"color:var(--ai)":""};display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-top:4px">${esc(line)}</div></div>`;
   }).join("");
   const item = (id, name, desc) => {
-    const live = id === "tg";
-    return `<div class="hitem" ${live ? 'data-gotab="telegram" style="cursor:pointer"' : ""}>
+    const live = !!LIVE[id];
+    return `<div class="hitem" ${live ? `data-gotab="${LIVE[id]}" style="cursor:pointer"` : ""}>
       <div style="display:flex;align-items:center;gap:8px"><span class="hname">${name}</span>
       <span class="htag ${live ? "on" : ""}">${live ? "LIVE" : "준비 중"}</span></div>
-      <div class="hdesc">${desc}</div></div>${live ? `<div style="padding-left:10px;border-left:1px solid var(--line);margin:0 0 6px 2px">${rows}</div>` : ""}`;
+      <div class="hdesc">${desc}</div></div>${id === "tg" ? `<div style="padding-left:10px;border-left:1px solid var(--line);margin:0 0 6px 2px">${rows}</div>` : ""}`;
   };
-  return box("watch", "관심 종목 · 스크리너", soon) +
+  const dash = `<div class="hitem"><div style="display:flex;align-items:center;gap:8px"><span class="hname">시장 체력</span><span class="htag">준비 중</span></div><div class="hdesc">52주 신고가 · 신저가 수, 상승 · 하락 종목 비율</div></div>
+    <div class="hitem"><div style="display:flex;align-items:center;gap:8px"><span class="hname">증시 자금</span><span class="htag">준비 중</span></div><div class="hdesc">고객예탁금 · 신용융자 잔고 추이</div></div>`;
+  return box("dash", "대시보드", dash) + box("watch", "관심 종목 · 스크리너", soon) +
     HOME_SECTIONS.map(([id, t, items]) => box(id, t, items.map(i => item(...i)).join(""))).join("");
 }
+let SQ = null, sqState = Object.assign({sub:"rank", dv:5e6, sv:1e7, q:""}, store.get("sq", {}));
+const fmtUsd = v => v == null ? "-" : v >= 1e9 ? "$" + (v/1e9).toFixed(1) + "B" : v >= 1e6 ? "$" + (v/1e6).toFixed(1) + "M" : "$" + Math.round(v/1e3) + "K";
+const pctS = (v, d=1) => v == null ? "-" : (v >= 0 ? "▲" : "▼") + Math.abs(v*100).toFixed(d) + "%";
+async function loadSQ(){
+  try{ const r = await fetch("squeeze.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok) SQ = await r.json(); }catch(e){}
+  if(state.tab === "sq") render();
+}
+function sqRow(r, i){
+  const cls = v => v == null ? "" : v >= 0 ? "u" : "d";
+  return `<div class="sqr">
+    <div class="sqh"><span class="sqn">${i+1}</span><a class="sqt" href="https://finance.yahoo.com/quote/${encodeURIComponent(r.t)}" target="_blank" rel="noopener">${esc(r.t)}</a>
+      <span class="sqnm">${esc((r.name || r.issue || "").slice(0,28))}</span><span class="sqs">${r.score.toFixed(0)}</span></div>
+    <div class="sqbar"><i style="width:${r.score}%"></i></div>
+    <div class="sqg">
+      <span>가격</span><b>$${r.price < 10 ? r.price.toFixed(2) : r.price.toFixed(1)}</b><span>1일</span><b class="${cls(r.ret1)}">${pctS(r.ret1)}</b>
+      <span>숏커버</span><b>${r.dtc ? r.dtc.toFixed(1) + "일" : "-"}</b><span>잔고 증감</span><b class="${cls(r.sichg)}">${pctS(r.sichg,0)}</b>
+      <span>공매도 비중</span><b>${r.svr ? (r.svr*100).toFixed(0) + "%" : "-"}</b><span>거래량</span><b>${r.surge.toFixed(1)}배</b>
+      <span>잔고 금액</span><b>${fmtUsd(r.sival)}</b><span>Reddit</span><b>${r.reddit || 0}</b>
+    </div>
+    ${r.signals && r.signals.length ? `<div class="sqsig">${r.signals.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
+  </div>`;
+}
+function sqHtml(){
+  if(!SQ){ loadSQ(); return `<div class="empty">불러오는 중…</div>`; }
+  const st = sqState;
+  const btn = (k, v, label) => `<button class="chip ${st[k]===v?"on":""}" data-sq="${k}" data-v="${v}">${label}</button>`;
+  let rows = SQ.rows.filter(r => r.dv20 >= st.dv && r.sival >= st.sv);
+  if(st.sub === "si") rows = rows.slice().sort((a,b) => (b.sival||0) - (a.sival||0));
+  if(st.sub === "sig") rows = rows.filter(r => (r.signals||[]).some(x => /급증|급등|잔고 \+/.test(x)));
+  if(st.sub === "find"){ const q = st.q.trim().toUpperCase(); rows = q ? SQ.rows.filter(r => r.t.includes(q) || (r.name||"").toUpperCase().includes(q)) : []; }
+  const sub = (k, l) => `<button class="tab ${st.sub===k?"on":""}" data-sqsub="${k}">${l}</button>`;
+  return `<button class="more" data-gotab="home" style="padding:12px 0 0">← 홈</button>
+  <div class="sec" style="margin-top:6px">── SHORT SQUEEZE US</div>
+  <div class="hdesc" style="margin:8px 0;line-height:1.7">공매도 잔고 기준일 <b style="color:var(--ink)">${esc(SQ.si_date)}</b> · 일별 공매도 ${esc((SQ.regsho_date||"").replace(/(\d{4})(\d\d)(\d\d)/,"$1-$2-$3"))} · 계산 ${fmtTime(SQ.generated)}<br>
+  공매도 잔고는 월 2회만 공개됩니다. 점수(0~100)는 숏커버 일수·잔고 증감·공매도 비중·거래량·주가·Reddit을 합친 <b style="color:var(--amber)">상대 순위</b>입니다. 유통주식수·대차 수수료는 미수집.</div>
+  <div class="tabs" style="padding:0">${sub("rank","순위")}${sub("si","잔고")}${sub("sig","신호")}${sub("find","검색")}</div>
+  ${st.sub === "find" ? `<input id="sqq" value="${esc(st.q)}" placeholder="티커 또는 회사명 (예: GME)" style="width:100%;margin:12px 0;padding:12px;border-radius:6px;border:1px solid #333;background:var(--panel);color:var(--ink);font-size:16px">`
+   : `<div class="sqf"><span>거래대금</span>${btn("dv",0,"제한 없음")}${btn("dv",1e6,"일 100만$↑")}${btn("dv",5e6,"일 500만$↑")}${btn("dv",2e7,"일 2천만$↑")}</div>
+      <div class="sqf"><span>잔고 금액</span>${btn("sv",0,"전체")}${btn("sv",1e7,"1천만$↑")}${btn("sv",1e8,"1억$↑")}${btn("sv",1e9,"10억$↑")}</div>`}
+  <div class="hdesc" style="margin:6px 0">${rows.length}종목</div>
+  ${rows.slice(0, 60).map(sqRow).join("") || `<div class="empty">${st.sub==="find" ? "검색어를 입력하세요" : "조건에 맞는 종목이 없습니다"}</div>`}`;
+}
 function render(){
-  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
+  document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab || (state.tab === "sq" && b.dataset.tab === "home")));
   if(!state.chip || !DATA.channels.some(c=>c.id===state.chip)) state.chip = DATA.channels[0].id;
   markSeen();
   renderChips();
+  if(state.tab === "sq"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = sqHtml(); return; }
   if(state.tab === "home"){ $("#feed").innerHTML = homeHtml(); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
   const list = state.tab === "report" ? DATA.posts.filter(p => p.report) : postsFor(state.tab, state.chip);
   $("#feed").innerHTML = list.length
@@ -492,7 +558,12 @@ $("#feed").addEventListener("toggle", e => {
   const d = e.target; if(!d.matches || !d.matches("details.fold")) return;
   const f = store.get("fold", {}); f[d.dataset.fold] = !d.open; store.set("fold", f);
 }, true);
+$("#feed").addEventListener("input", e => {
+  if(e.target.id === "sqq"){ sqState.q = e.target.value; store.set("sq", sqState); const pos = e.target.selectionStart; render(); const el = $("#sqq"); el.focus(); el.setSelectionRange(pos, pos); }
+});
 $("#feed").addEventListener("click", e => {
+  const sb = e.target.closest("[data-sqsub]"); if(sb){ sqState.sub = sb.dataset.sqsub; store.set("sq", sqState); render(); return; }
+  const sf = e.target.closest("[data-sq]"); if(sf){ sqState[sf.dataset.sq] = +sf.dataset.v; store.set("sq", sqState); render(); return; }
   const gt = e.target.closest("[data-gotab]");
   if(gt && !e.target.closest("[data-go]")){ state.tab = gt.dataset.gotab; store.set("tab2", state.tab); render(); scrollTo(0,0); return; }
   const go = e.target.closest("[data-go]");
