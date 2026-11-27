@@ -52,8 +52,14 @@ def run():
             s = {"no": x["no"], "name": x["name"], "chg": f(x.get("changeRate")), "n": x.get("totalCount"),
                  "up": x.get("riseCount"), "dn": x.get("fallCount"), "stocks": prev.get(x["no"], {}).get("stocks", [])}
             if detail:
-                d = get(f"/api/stocks/industry/{x['no']}?page=1&pageSize=60")
-                st = (d or {}).get("stocks") or []
+                st, pg = [], 1
+                while pg <= 6:
+                    d = get(f"/api/stocks/industry/{x['no']}?page={pg}&pageSize=100")
+                    part = (d or {}).get("stocks") or []
+                    st += part
+                    if len(part) < 100: break
+                    pg += 1; time.sleep(0.1)
+                d = {"stocks": list(st)}
                 if st:
                     st = sorted(st, key=lambda y: -(f(y.get("marketValue")) or 0))[:12]
                     s["stocks"] = [{"c": y.get("itemCode"), "n": y.get("stockName"), "chg": f(y.get("fluctuationsRatio")), "mv": f(y.get("marketValue"))} for y in st]

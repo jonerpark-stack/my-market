@@ -847,11 +847,11 @@ function heatHtml(){
   let h = `<div style="margin:12px 0 6px;font-size:13.5px">${idx}</div>
     <div style="display:flex;gap:6px;margin:8px 0"><button class="act" data-hsort="mv" style="${heatSort === "mv" ? "color:var(--amber);border-color:var(--amber)" : ""}">시총순</button><button class="act" data-hsort="chg" style="${heatSort === "chg" ? "color:var(--amber);border-color:var(--amber)" : ""}">등락순</button>
     <span class="hdesc" style="margin-left:auto;align-self:center">${esc((KR.generated || "").slice(11, 16))} 기준</span></div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">`;
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px">`;
   for(const x of ss){
     const big = heatSort === "mv" && (x.mv || 0) >= top && top > 0;
     h += `<div data-heat="${x.no}" style="grid-column:span ${big ? 2 : 1};background:${kcol(x.chg)};border-radius:4px;padding:${big ? "12px 8px" : "8px 5px"};cursor:pointer;min-height:${big ? 62 : 48}px;${heatSel === x.no ? "outline:2px solid var(--amber)" : ""}">
-      <div style="font-size:${big ? 13.5 : 11.5}px;font-weight:700;line-height:1.25;word-break:keep-all">${esc(x.name)}</div>
+      <div style="font-size:${big ? 13.5 : 11.5}px;font-weight:700;line-height:1.25;word-break:break-all;overflow:hidden">${esc(x.name)}</div>
       <div style="font-size:${big ? 13 : 11.5}px;margin-top:3px">${sgnp(x.chg)}</div></div>`;
     if(heatSel === x.no) h += `<div style="grid-column:1/-1;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:2px 0 6px">
       <div class="hdesc" style="margin-bottom:6px">${esc(x.name)} · ${x.n || "?"}종목 · 상승 ${x.up ?? "-"} / 하락 ${x.dn ?? "-"}</div>
@@ -1198,7 +1198,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795776957";
+const APP_VERSION = "1795777600";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
