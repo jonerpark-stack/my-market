@@ -519,7 +519,27 @@ const HOME_SECTIONS = [
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
 const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1, fg: 1, reddit: 1};
-let watch = store.get("watch", []), wq = "", wOpen = null;
+let watch = store.get("watch", []), wq = "", wOpen = null, SCR = null, scrLoading = false, scrNear = false;
+const watchAuto = new Set(store.get("watchAuto", [])), watchOff = new Set(store.get("watchOff", []));
+async function loadSCR(){ if(scrLoading) return; scrLoading = true; try{ const r = await fetch("screener.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ SCR = await r.json();
+  for(const x of SCR.passed || []) if(!watch.includes(x.c) && !watchOff.has(x.c)){ watch.push(x.c); watchAuto.add(x.c); }
+  store.set("watch", watch); store.set("watchAuto", [...watchAuto]); if(state.tab === "home") render(); } }catch(e){} }
+function scrRow(x){
+  const tag = (t, c) => `<span style="font-size:11px;border:1px solid ${c};color:${c};border-radius:4px;padding:0 4px;margin:2px 3px 0 0;display:inline-block">${esc(t)}</span>`;
+  return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div data-wopen2="${x.c}" style="display:flex;gap:8px;align-items:center;cursor:pointer"><div style="flex:1;min-width:0"><b>${esc(x.n)}</b> <span style="color:var(--sub);font-size:11.5px">${x.c} · ${esc(SEC2GRP[x.sec] || x.sec || "")}</span></div>
+    <span style="font-size:12px;color:var(--sub)">RSI ${x.rsi}/${x.sig}</span><b style="color:${fcol(x.chg)};font-size:13px">${sgnp(x.chg)}</b></div>
+    <div>${x.fund_t ? tag(x.fund_t, "#9ccc65") : ""}${(x.why || []).map(w => tag(w, "var(--amber)")).join("")}${[...x.cu.map(n => "주봉 " + n), ...x.du.map(n => "일봉 " + n)].map(n => tag(n, "#f87171")).join("")}${[...x.cd.map(n => "주봉 " + n), ...x.dd.map(n => "일봉 " + n)].map(n => tag("⚠ " + n, "#60a5fa")).join("")}</div></div>`;
+}
+function scrHtml(){
+  if(!SCR){ loadSCR(); return ""; }
+  const ps = SCR.passed || [], nr = SCR.near || [];
+  return `<div class="rpsub" style="margin-top:14px">🔎 스크리너 통과 ${ps.length}종목 <span style="color:var(--sub);font-weight:400;font-size:12px">· 판정 ${SCR.filled}/${SCR.universe} · ${esc((SCR.generated || "").slice(5, 16).replace("T", " "))}</span></div>
+    ${ps.map(scrRow).join("") || `<div class="hdesc" style="margin:6px 0">${SCR.filled < SCR.universe ? "종목 데이터를 채우는 중입니다." : "오늘 조건을 통과한 종목이 없습니다."}</div>`}
+    ${nr.length ? `<div data-scrnear="1" class="hdesc" style="margin:8px 0;cursor:pointer;color:var(--amber)">${scrNear ? "▴" : "▾"} 돌파 임박 ${nr.length}종목 (실적 관문 통과 · RSI가 시그널선 2pt 아래에서 상승 중)</div>${scrNear ? nr.map(scrRow).join("") : ""}` : ""}
+    <div class="hdesc" style="margin:8px 0">통과 조건: 영업이익 3분기 연속 증가 또는 흑자 전환 + 주봉 RSI(14)가 시그널선(9주 평균)을 최근 2주 안에 상향 돌파 · 가점: RSI ≤ 50, 거래량 1.2배, 상승 다이버전스, 상승 캔들 · ⚠ 하락 캔들은 경고 · 시총 1000억 이상, 우선주·스팩 제외 · 수주잔고는 데이터 출처가 없어 미반영 · 가격은 하루 1회 + 장중 후보 1시간마다</div>`;
+}
+document.addEventListener("click", e => { if(e.target.closest("[data-scrnear]")){ scrNear = !scrNear; render(); return; }
+  const o = e.target.closest("[data-wopen2]"); if(o){ const c = o.dataset.wopen2; if(!watch.includes(c)){ watch.push(c); store.set("watch", watch); } wOpen = c; render(); } });
 function watchHtml(){
   if(!KR){ loadKR(); return `<div class="hdesc" style="margin:10px 0">불러오는 중…</div>`; }
   if(!DART) loadDart(); if(!RP) loadRP();
@@ -527,11 +547,12 @@ function watchHtml(){
   const rows = watch.map(c => st[c]).filter(Boolean).map(y => {
     const ds = DART ? DART.items.filter(x => x.code === y[0]) : [], rs = RP ? (RP.items || []).filter(x => (x.target || "").includes(y[1]) || (x.title || "").includes(y[1])) : [];
     const open = wOpen === y[0];
-    return `<div style="border-bottom:1px solid var(--line)"><div data-wopen="${y[0]}" style="display:flex;align-items:center;gap:8px;padding:9px 0;cursor:pointer">
-      <div style="flex:1;min-width:0"><b>${esc(y[1])}</b> <span style="color:var(--sub);font-size:11.5px">${y[0]} · ${esc(SEC2GRP[y[5]] || y[5] || "")}</span>
+    const auto = watchAuto.has(y[0]), sx = SCR && (SCR.passed || []).find(z => z.c === y[0]);
+    return `<div style="border-bottom:1px solid var(--line);${sx ? "border-left:3px solid var(--amber);padding-left:7px;background:rgba(255,179,0,.06)" : ""}"><div data-wopen="${y[0]}" style="display:flex;align-items:center;gap:8px;padding:9px 0;cursor:pointer">
+      <div style="flex:1;min-width:0"><b>${esc(y[1])}</b>${sx ? ` <span style="font-size:10.5px;background:var(--amber);color:#111;border-radius:3px;padding:0 4px">스크리너${auto ? " 자동" : ""}</span>` : ""} <span style="color:var(--sub);font-size:11.5px">${y[0]} · ${esc(SEC2GRP[y[5]] || y[5] || "")}</span>
       <div style="font-size:11.5px;color:var(--sub);margin-top:2px">${ds.length ? `<span style="color:var(--amber)">공시 ${ds.length}</span> · ` : ""}${rs.length ? `<span style="color:var(--amber)">리포트 ${rs.length}</span> · ` : ""}시총 ${y[3] >= 10000 ? (y[3] / 10000).toFixed(1) + "조" : Math.round(y[3]).toLocaleString() + "억"}</div></div>
       <b style="color:${fcol(y[2])}">${sgnp(y[2])}</b><button class="rpb" data-wdel="${y[0]}" aria-label="삭제" style="width:28px;height:28px;font-size:13px">✕</button></div>
-      ${open ? `<div style="padding:0 0 10px 8px;border-left:2px solid var(--amber);margin-bottom:8px">
+      ${open ? `<div style="padding:0 0 10px 8px;border-left:2px solid var(--amber);margin-bottom:8px">${sx ? scrRow(sx).replace("border-bottom:1px solid var(--line)", "") : ""}
         ${ds.slice(0, 6).map(x => `<a data-dart="${x.rno}" href="#" style="display:block;font-size:12.5px;color:var(--ink);text-decoration:none;padding:3px 0">📄 ${x.dt.slice(4,6)}/${x.dt.slice(6)} ${esc(x.nm)}${dartSummary(x) ? ` <span style="color:var(--sub)">· ${dartSummary(x)}</span>` : ""}</a>`).join("") || `<div class="hdesc">최근 30일 주요 공시 없음</div>`}
         ${rs.slice(0, 5).map(x => `<div data-rp="${x.id}" style="font-size:12.5px;padding:3px 0;cursor:pointer">📑 ${esc(x.broker || "")} · ${esc(x.title || "")}</div>`).join("")}
         <a href="https://m.stock.naver.com/domestic/stock/${y[0]}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--sub)">네이버 종목 화면 ›</a></div>` : ""}</div>`;
@@ -540,14 +561,14 @@ function watchHtml(){
   return `<div style="position:relative;margin:10px 0 4px"><input id="wq" value="${esc(wq)}" placeholder="종목명 · 코드로 추가" style="width:100%;padding:10px;border-radius:6px;border:1px solid #333;background:var(--bg);color:var(--ink);font-size:15px">
     <div id="wsug">${wsugHtml(sug)}</div></div>
     ${rows || `<div class="hdesc" style="margin:8px 0">관심 종목을 추가하면 등락률 · 최근 공시 · 관련 리포트를 한 번에 봅니다.</div>`}
-    <div class="hdesc" style="margin:8px 0">이 기기에 저장 · 스크리너(주봉 RSI·캔들·실적 조건)는 다음 단계</div>`;
+    <div class="hdesc" style="margin:8px 0">이 기기에 저장 · 스크리너 통과 종목은 자동 추가·강조 (✕로 빼면 다시 자동 추가 안 함)</div>${scrHtml()}`;
 }
 function wsugHtml(sug){ return sug.map(y => `<div data-wadd="${y[0]}" style="display:flex;gap:8px;padding:8px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13.5px"><span style="flex:1">${esc(y[1])} <span style="color:var(--sub);font-size:11.5px">${y[0]} · ${y[4] === "K" ? "KOSPI" : "KOSDAQ"}</span></span><span style="color:var(--amber)">＋ 추가</span></div>`).join(""); }
 document.addEventListener("input", e => { if(e.target.id === "wq"){ wq = e.target.value; const q = wq.trim().toLowerCase();
   $("#wsug").innerHTML = wsugHtml(q && KR ? (KR.stocks || []).filter(y => y[1].toLowerCase().includes(q) || y[0].includes(q)).slice(0, 6) : []); } });
 document.addEventListener("click", e => {
   const a = e.target.closest("[data-wadd]"); if(a){ if(!watch.includes(a.dataset.wadd)) watch.push(a.dataset.wadd); store.set("watch", watch); wq = ""; render(); return; }
-  const d = e.target.closest("[data-wdel]"); if(d){ e.stopPropagation(); watch = watch.filter(c => c !== d.dataset.wdel); store.set("watch", watch); render(); return; }
+  const d = e.target.closest("[data-wdel]"); if(d){ e.stopPropagation(); watch = watch.filter(c => c !== d.dataset.wdel); store.set("watch", watch); if(watchAuto.has(d.dataset.wdel)){ watchAuto.delete(d.dataset.wdel); watchOff.add(d.dataset.wdel); store.set("watchAuto", [...watchAuto]); store.set("watchOff", [...watchOff]); } render(); return; }
   const o = e.target.closest("[data-wopen]"); if(o){ wOpen = wOpen === o.dataset.wopen ? null : o.dataset.wopen; render(); }
 });
 function dashHtml(){
@@ -1417,7 +1438,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795782338";
+const APP_VERSION = "1795784111";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
