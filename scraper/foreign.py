@@ -130,6 +130,9 @@ def summarize(item):
         if not page:
             return None
         html = _get(page)[0].decode("utf-8", "replace")
+        mm = re.search(r'href="(/monetarypolicy/fomcminutes\d+\.htm)"', html)
+        if item["house"] == "Federal Reserve" and mm:  # 의사록 보도자료 → 의사록 본문으로 이동
+            html = _get("https://www.federalreserve.gov" + mm.group(1))[0].decode("utf-8", "replace")
         text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", html, flags=re.S)
         text = re.sub(r"<[^>]+>", " ", text)
         parts.append({"text": re.sub(r"\s+", " ", text)[:30000]})

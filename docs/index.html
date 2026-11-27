@@ -305,6 +305,29 @@ function cardHtml(p){
       <a class="act" href="${esc(p.url)}" target="_blank" rel="noopener">🔗 원문</a>
     </div></article>`;
 }
+let FR = null;
+async function loadFR(){
+  try{ const r = await fetch("foreign.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok) FR = await r.json(); }catch(e){ FR = {items:[]}; }
+  if(state.tab === "report") render();
+}
+function foreignHtml(){
+  if(!FR){ loadFR(); return ""; }
+  const fold = store.get("fold", {});
+  const rows = (FR.items || []).map(x => {
+    const sm = x.summary && x.summary.text ? x.summary.text : "";
+    const first = sm.split("\n").find(l => l.trim()) || "";
+    const rest = sm.split("\n").slice(1).filter(l => l.trim()).map(l => `<p>${esc(l)}</p>`).join("");
+    return `<div class="card" id="fr-${esc(x.id)}">
+      <div class="card-h"><span>${esc(x.house)}</span><span class="nm" style="color:var(--sub)">${esc(x.series)}</span><span style="color:var(--sub)">${esc(x.date)}</span></div>
+      <div style="font-weight:800;font-size:15.5px;margin-top:6px">${esc(x.title)}</div>
+      ${sm ? `<details class="ai"><summary>AI› ${esc(first)} <span class="hint">▾</span></summary><div class="ai-body">${rest}<div class="note">${esc(x.summary.model || "AI")} 한국어 요약 · 원문 확인 필요</div></div></details>`
+           : `<div class="hdesc" style="margin-top:6px">AI 요약 준비 중</div>`}
+      <div class="actions"><a class="act" href="${esc(x.url)}" target="_blank" rel="noopener">${x.pdf ? "📄 원문 PDF" : "🔗 원문"}</a></div></div>`;
+  }).join("");
+  return `<details class="fold" id="sec-foreign" data-fold="foreign" ${fold.foreign ? "" : "open"}><summary class="sec">── 해외 · 하우스뷰 <span class="fa">▾</span></summary>
+    <div class="hdesc" style="margin:8px 0">블랙록 · JP모건 · 뱅가드 · 연준 등 공개 리포트를 Gemini가 한국어로 요약합니다.</div>${rows || '<div class="empty">아직 수집된 리포트가 없습니다</div>'}</details>
+    <details class="fold" id="sec-local" data-fold="local" ${fold.local ? "" : "open"}><summary class="sec">── 국내 · 채널 리포트 <span class="fa">▾</span></summary>`;
+}
 function reportHtml(p){
   const title = (p.docs && p.docs[0]) || p.text.split("\n").find(l => l.trim()) || "리포트";
   const pdf = (p.links||[]).find(l => /\.pdf($|\?)/i.test(l)) || (p.links||[])[0] || p.url;
@@ -429,7 +452,7 @@ function render(){
   if(state.tab === "home"){ $("#feed").innerHTML = homeHtml(); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
   const list = state.tab === "report" ? DATA.posts.filter(p => p.report && !REPORT_EXCLUDE.includes(p.channel)) : postsFor(state.tab, state.chip);
   $("#feed").innerHTML = list.length
-    ? (state.tab === "report" ? grouped(list, p => INSITE.includes(p.channel) ? cardHtml(p) : reportHtml(p)) : grouped(list.slice(0,150), cardHtml))
+    ? (state.tab === "report" ? foreignHtml() + grouped(list, p => INSITE.includes(p.channel) ? cardHtml(p) : reportHtml(p)) + (FR ? "</details>" : "") : grouped(list.slice(0,150), cardHtml))
     : `<div class="empty">표시할 글이 없습니다.</div>`;
   $("#updated").textContent = "갱신 " + fmtTime(DATA.updated);
 }
@@ -607,7 +630,7 @@ function buildMenu(){
   $("#dnav").innerHTML = `<h3>JP View 목차</h3>
     <details open><summary class="l1">홈</summary>${homeHtml2}</details>
     <details><summary class="l1">텔레그램 시황</summary>${tg}</details>
-    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>`;
+    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}${l3("rep:foreign", "해외 · 하우스뷰")}${l3("rep:local", "국내 · 채널 리포트")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>`;
 }
 function menu(open){ if(open) buildMenu(); $("#drawer").classList.toggle("hidden", !open); }
 $("#menuBtn").addEventListener("click", () => menu(true));
@@ -618,6 +641,8 @@ $("#drawer").addEventListener("click", e => {
   menu(false);
   if(kind === "ch"){ state.tab = "telegram"; state.chip = x; store.set("tab2","telegram"); store.set("chip2", x); render(); scrollTo(0,0); return; }
   if(kind === "tab"){ state.tab = x; store.set("tab2", x); render(); scrollTo(0,0); return; }
+  if(kind === "rep"){ state.tab = "report"; store.set("tab2","report"); const f = store.get("fold", {}); f[x] = false; store.set("fold", f); render();
+    setTimeout(() => { const el = document.getElementById("sec-" + x); el && scrollTo({top: el.getBoundingClientRect().top + scrollY - document.querySelector("header").offsetHeight - 8, behavior:"smooth"}); }, 300); return; }
   if(y && LIVE[y] === "sq"){ state.tab = "sq"; render(); scrollTo(0,0); return; }
   if(y && LIVE[y] === "telegram"){ state.tab = "telegram"; store.set("tab2","telegram"); render(); scrollTo(0,0); return; }
   state.tab = "home"; store.set("tab2","home");
@@ -679,7 +704,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795754401";
+const APP_VERSION = "1795755432";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
