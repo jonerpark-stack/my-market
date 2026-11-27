@@ -147,7 +147,11 @@ AI_PROMPT = """너는 거시경제·채권·주식 시장을 다루는 시니어
 - 각 항목은 1~2문장, 이모지로 시작.
 - 반드시 아래 JSON 형식으로만 답할 것.
 
-{"key": "🔑 핵심 한 줄", "watch": ["⚠️ 주목할 점", "..."], "background": ["📚 알아두면 좋은 배경지식", "..."], "implication": "🧭 시장 시사점"}
+JSON 키 설명 (예시 문구를 그대로 쓰지 말고 원문 내용으로 채울 것):
+- key: 🔑로 시작하는 핵심 요약 1문장
+- watch: ⚠️로 시작하는 주목할 점 1~3개 배열
+- background: 📚로 시작하는 배경지식 0~2개 배열
+- implication: 🧭로 시작하는 시장 시사점 1문장
 
 [채널] {channel}
 [작성시각] {date}
@@ -226,6 +230,8 @@ def ai_comment(post: dict, channel_name: str) -> dict | None:
         print(f"[AI] {post['uid']} 실패: {e}", file=sys.stderr)
         return None
     parsed = _parse_ai_json(content)
+    if parsed and ("핵심 한 줄" in parsed["key"] or len(parsed["key"]) < 12):
+        return None
     if parsed:
         parsed["model"] = f"{provider}:{model}"
     return parsed
@@ -245,6 +251,9 @@ def main():
             print("기존 데이터 복호화 실패(비밀번호 변경?) → 새로 수집합니다.", file=sys.stderr)
 
     by_uid = {p["uid"]: p for p in state.get("posts", [])}
+    for p in by_uid.values():  # 예시 문구를 그대로 베낀 불량 코멘트는 재생성
+        if p.get("ai") and ("핵심 한 줄" in (p["ai"].get("key") or "") or len(p["ai"].get("key") or "") < 12):
+            p["ai"] = None
     first_run = not by_uid
     names = {c["id"]: c["name"] for c in CONFIG["channels"]}
 

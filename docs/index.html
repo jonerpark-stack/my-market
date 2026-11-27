@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>내 시황</title>
+<title>JP View</title>
 <style>
 /* 터미널형: 검정 바탕, 앰버 강조, 상승 빨강/하락 파랑, 고정폭 숫자 */
 :root{
@@ -106,7 +106,7 @@ details.ai summary .hint{color:var(--sub)}
 <section id="app" class="hidden">
   <header>
     <div class="top">
-      <h1>MARKET.LOG</h1>
+      <h1>JP View</h1>
       <div class="meta">
         <span id="updated">-</span>
         <button class="icon-btn" id="refreshBtn" aria-label="새로고침">🔄</button>
@@ -114,8 +114,9 @@ details.ai summary .hint{color:var(--sub)}
       </div>
     </div>
     <nav class="tabs" id="tabs">
-      <button class="tab on" data-tab="telegram">✈️ 텔레그램</button>
-      <button class="tab" data-tab="report">📄 리포트</button>
+      <button class="tab on" data-tab="home">전체</button>
+      <button class="tab" data-tab="telegram">텔레그램 시황</button>
+      <button class="tab" data-tab="report">리포트</button>
     </nav>
     <div class="chips" id="chips"></div>
   </header>
@@ -161,7 +162,7 @@ const EMOJI_RULES = [
 ];
 
 let DATA = null, PASSWORD = null;
-let state = { tab: store.get("tab","telegram"), chip: store.get("chip","all") };
+let state = { tab: store.get("tab2","home"), chip: store.get("chip2", null) };
 let seen = store.get("seen", {});          // 채널별 마지막으로 본 메시지 ID
 let seenAtOpen = {...seen};                // 이번 접속 시점의 기준(🆕 표시용)
 let keywords = store.get("keywords", DEFAULT_KEYWORDS);
@@ -215,9 +216,9 @@ function renderChips(){
   for(const c of chans){
     counts[c.id] = DATA.posts.filter(p => p.channel === c.id && p.id > (seen[c.id] || 0) && (state.tab !== "report" || p.report)).length;
   }
-  const total = Object.values(counts).reduce((a,b)=>a+b,0);
   const chip = (id, label, n) => `<button class="chip ${state.chip===id?"on":""}" data-chip="${id}">${label}${n?`<span class="badge">${n}</span>`:""}</button>`;
-  $("#chips").innerHTML = chip("all","전체",total) + chans.map(c => chip(c.id, `${c.emoji} ${esc(c.name)}`, counts[c.id])).join("");
+  $("#chips").innerHTML = chans.map(c => chip(c.id, esc(c.name), state.chip===c.id ? 0 : counts[c.id])).join("");
+  $("#chips").classList.toggle("hidden", state.tab !== "telegram");
 }
 function aiHtml(ai){
   if(!ai) return "";
@@ -285,19 +286,36 @@ function grouped(list, fn){
   }
   return out;
 }
+function homeHtml(){
+  const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
+  const box = (t, body) => `<div class="sec">── ${t}</div>${body}`;
+  const soon = `<div class="linkcard" style="display:block;color:var(--sub);font-size:13px">관심 종목 시세 · 스크리너 · DART 공시 · 관심 종목 리포트<br>→ 키 등록 후 활성화 예정</div>`;
+  const rows = latest.map(p => {
+    const t = new Date(p.date).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Seoul"});
+    const line = p.ai && p.ai.key ? "AI› " + p.ai.key.replace(/^🔑\s*/,"") : p.text.split("\n").find(l=>l.trim()) || "";
+    const isNew = p.id > (seen[p.channel] || 0);
+    return `<div class="card" style="cursor:pointer" data-go="${esc(p.channel)}">
+      <div class="card-h"><span>${esc(chName(p.channel))}</span><span style="color:var(--sub)">${fmtTime(p.date)}</span>${isNew?'<span class="new">NEW</span>':""}</div>
+      ${ticksHtml(p)}
+      <div class="body" style="${p.ai?"color:var(--ai)":""};display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${esc(line)}</div></div>`;
+  }).join("");
+  return box("관심 종목 · 스크리너", soon) + box("채널별 최신 시황", rows || `<div class="empty">아직 글이 없습니다.</div>`);
+}
 function render(){
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
+  if(!state.chip || !DATA.channels.some(c=>c.id===state.chip)) state.chip = DATA.channels[0].id;
   markSeen();
   renderChips();
-  const list = postsFor(state.tab, state.chip);
+  if(state.tab === "home"){ $("#feed").innerHTML = homeHtml(); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
+  const list = state.tab === "report" ? DATA.posts.filter(p => p.report) : postsFor(state.tab, state.chip);
   $("#feed").innerHTML = list.length
     ? (state.tab === "report" ? grouped(list, reportHtml) : grouped(list.slice(0,150), cardHtml))
     : `<div class="empty">표시할 글이 없습니다.</div>`;
   $("#updated").textContent = "갱신 " + fmtTime(DATA.updated);
 }
 function markSeen(){
-  const ids = state.chip === "all" ? DATA.channels.map(c=>c.id) : [state.chip];
-  if(state.tab === "report") return;
+  if(state.tab !== "telegram") return;
+  const ids = [state.chip];
   for(const id of ids){
     const max = Math.max(0, ...DATA.posts.filter(p=>p.channel===id).map(p=>p.id));
     if(max > (seen[id]||0)) seen[id] = max;
@@ -425,13 +443,15 @@ async function doShare(){
 /* ---------- 이벤트 ---------- */
 $("#tabs").addEventListener("click", e => {
   const b = e.target.closest(".tab"); if(!b) return;
-  state.tab = b.dataset.tab; store.set("tab", state.tab); render(); scrollTo(0,0);
+  state.tab = b.dataset.tab; store.set("tab2", state.tab); render(); scrollTo(0,0);
 });
 $("#chips").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if(!b) return;
-  state.chip = b.dataset.chip; store.set("chip", state.chip); render(); scrollTo(0,0);
+  state.chip = b.dataset.chip; store.set("chip2", state.chip); render(); scrollTo(0,0);
 });
 $("#feed").addEventListener("click", e => {
+  const go = e.target.closest("[data-go]");
+  if(go){ state.tab = "telegram"; state.chip = go.dataset.go; store.set("tab2","telegram"); store.set("chip2",state.chip); render(); scrollTo(0,0); return; }
   const more = e.target.closest(".more");
   if(more){ const body = more.previousElementSibling; const open = body.classList.toggle("clamp"); more.textContent = open ? "더보기 ▾" : "접기 ▴"; return; }
   const s = e.target.closest("[data-share]"); if(s) openShare(s.dataset.share);
@@ -464,7 +484,6 @@ async function unlock(pw, remember){
     PASSWORD = pw;
     if(pw !== null){ if(remember) store.set("pw", pw); else store.del("pw"); }
     $("#lock").classList.add("hidden"); $("#app").classList.remove("hidden");
-    if(state.chip !== "all" && !DATA.channels.some(c=>c.id===state.chip)) state.chip = "all";
     render();
     setInterval(() => refresh(false), 5*60*1000);
     document.addEventListener("visibilitychange", () => { if(!document.hidden) refresh(false); });

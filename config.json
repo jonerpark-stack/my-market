@@ -1,7 +1,35 @@
 {
   "channels": [
-    { "id": "miraebond", "name": "미래에셋 채권·경제", "emoji": "🏦", "source": "telegram" },
-    { "id": "ehdwl", "name": "서상영", "emoji": "🇺🇸", "source": "telegram" }
+    {
+      "id": "globalmktinsight",
+      "name": "김석환",
+      "emoji": "📈",
+      "source": "telegram"
+    },
+    {
+      "id": "lim_econ",
+      "name": "임혜윤",
+      "emoji": "🌐",
+      "source": "telegram"
+    },
+    {
+      "id": "hedgecat0301",
+      "name": "한지영",
+      "emoji": "🐈",
+      "source": "telegram"
+    },
+    {
+      "id": "ehdwl",
+      "name": "서상영",
+      "emoji": "🇺🇸",
+      "source": "telegram"
+    },
+    {
+      "id": "miraebond",
+      "name": "민지희·정형기",
+      "emoji": "🏦",
+      "source": "telegram"
+    }
   ],
   "retention_days": 90,
   "ai_days": 3,
