@@ -424,7 +424,7 @@ function homeHtml(){
     box("kr", "한국 수급", HOME_SECTIONS[1][2].map(homeItem("kr")).join("")) +
     box("us", "미국 수급", HOME_SECTIONS[2][2].map(homeItem("us")).join(""));
 }
-const REPORT_EXCLUDE = ["globalmktinsight"];   // 리포트 탭에서 제외
+const REPORT_EXCLUDE = ["globalmktinsight", "ehdwl"];   // 리포트 탭에서 제외
 const INSITE = ["ehdwl"];                       // 텔레그램으로 넘기지 않고 사이트 안에서 본문 표시
 let SQ = null, sqState = Object.assign({sub:"rank", dv:5e6, sv:1e7, q:""}, store.get("sq", {}));
 const fmtUsd = v => v == null ? "-" : v >= 1e9 ? "$" + (v/1e9).toFixed(1) + "B" : v >= 1e6 ? "$" + (v/1e6).toFixed(1) + "M" : "$" + Math.round(v/1e3) + "K";
@@ -889,7 +889,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795760843";
+const APP_VERSION = "1795761781";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
