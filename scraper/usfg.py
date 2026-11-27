@@ -16,7 +16,7 @@ SECT = ["XLK", "XLF", "XLV", "XLY", "XLP", "XLE", "XLI", "XLB", "XLU", "XLRE", "
 
 def yahoo(t):
     try:
-        req = urllib.request.Request(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.request.quote(t)}?range=2y&interval=1d", headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.request.quote(t)}?range=5y&interval=1d", headers={"User-Agent": "Mozilla/5.0"})
         r = json.loads(urllib.request.urlopen(req, timeout=20).read().decode("utf-8"))["chart"]["result"][0]
         q = r["indicators"]["quote"][0]
         return {dt.datetime.utcfromtimestamp(ts).strftime("%Y%m%d"): (h, l, c) for ts, h, l, c in zip(r["timestamp"], q["high"], q["low"], q["close"]) if c}
@@ -80,10 +80,10 @@ def run():
     lab = "극단적 공포" if sc < 25 else "공포" if sc < 45 else "중립" if sc < 55 else "탐욕" if sc < 75 else "극단적 탐욕"
     hs = []
     names = [x["name"] for x in parts]; inv = {n: i for n, _, i, _, _ in comps}
-    for k in range(max(252, len(idx) - 130), len(idx)):
+    for k in range(max(120, len(idx) - 130), len(idx)):
         v = []
         for n in names:
-            s = sers[n][k - 251:k + 1]; p = pct(s, s[-1])
+            s = sers[n][max(0, k - 251):k + 1]; p = pct(s, s[-1])
             if p is not None: v.append(100 - p if inv[n] else p)
         if v: hs.append([days[start + k], round(sum(v) / len(v))])
     json.dump({"generated": dt.datetime.now(KST).isoformat(timespec="minutes"), "asof": days[-1], "score": sc, "label": lab, "parts": parts, "hist": hs},
