@@ -74,6 +74,10 @@ details.fold:not([open]) .fa{transform:rotate(-90deg)}
 .htag{font:700 10px var(--mono);padding:1px 6px;border-radius:3px;border:1px solid #333;color:var(--sub)}
 .htag.on{background:var(--ai);border-color:var(--ai);color:#0a0a0a}
 .sec{margin:20px 0 0;padding:8px 10px;font:800 14px var(--mono);color:var(--amber);background:#1a1400;border-left:3px solid var(--amber);border-radius:0 4px 4px 0;letter-spacing:.3px}
+#win{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column}
+.winhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line);font:800 15px var(--mono);color:var(--amber)}
+.winhead span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#winbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(30px + env(safe-area-inset-bottom))}
 #drawer{position:fixed;inset:0;z-index:40;display:flex}
 #drawer .dbg{position:absolute;inset:0;background:rgba(0,0,0,.6)}
 #drawer nav{position:relative;width:min(82vw,340px);height:100%;overflow-y:auto;background:#111;border-right:1px solid #333;padding:calc(16px + env(safe-area-inset-top)) 0 30px}
@@ -409,7 +413,7 @@ const fmtUsd = v => v == null ? "-" : v >= 1e9 ? "$" + (v/1e9).toFixed(1) + "B" 
 const pctS = (v, d=1) => v == null ? "-" : (v >= 0 ? "▲" : "▼") + Math.abs(v*100).toFixed(d) + "%";
 async function loadSQ(){
   try{ const r = await fetch("squeeze.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok) SQ = await r.json(); }catch(e){}
-  if(state.tab === "sq") render();
+  if(state.win === "sq") render();
 }
 const SQH = {}, sqOpen = new Set();
 async function loadHist(t){
@@ -417,7 +421,7 @@ async function loadHist(t){
   SQH[t] = "loading";
   try{ const r = await fetch(`sqhist/${encodeURIComponent(t)}.json?t=` + Date.now(), {cache:"no-store"}); SQH[t] = r.ok ? await r.json() : "none"; }
   catch(e){ SQH[t] = "none"; }
-  if(state.tab === "sq" || state.tab === "sqd") render();
+  if(state.win === "sq" || state.win === "sqd") render();
 }
 function histChart(h){
   const W = 360, H = 190, L = 40, Rr = 44, T = 14, B = 26, iw = W - L - Rr, ih = H - T - B;
@@ -458,7 +462,7 @@ function histHtml(r){
 let sqSel = null, sqScroll = 0;
 function sqDetailHtml(){
   const r = SQ && SQ.rows.find(x => x.t === sqSel);
-  if(!r) return `<button class="more" data-sqback="1" style="padding:12px 0 0">← SHORT SQUEEZE</button><div class="empty">종목을 찾을 수 없습니다.</div>`;
+  if(!r) return `<button class="more" data-sqback="1" style="padding:12px 0 0">← 목록으로</button><div class="empty">종목을 찾을 수 없습니다.</div>`;
   const h = SQH[r.t];
   if(r.hist && (!h || h === "loading")) loadHist(r.t);
   const ok = h && h !== "loading" && h !== "none" && h.px && h.px.length;
@@ -466,7 +470,7 @@ function sqDetailHtml(){
   const rank = SQ.rows.indexOf(r) + 1;
   const siRows = ok ? h.si.slice(-10).reverse().map((x, i, a) => { const p = a[i+1]; const c = p && p[1] ? x[1]/p[1]-1 : null;
       return `<span>${x[0]}</span><b>${x[1].toLocaleString()}</b><b class="${cls(c)}">${c == null ? "-" : (c>=0?"+":"") + (c*100).toFixed(1) + "%"}</b><b>${x[2] != null ? (+x[2]).toFixed(1) + "일" : "-"}</b>`; }).join("") : "";
-  return `<button class="more" data-sqback="1" style="padding:12px 0 0">← SHORT SQUEEZE</button>
+  return `<button class="more" data-sqback="1" style="padding:12px 0 0">← 목록으로</button>
   <div style="display:flex;align-items:baseline;gap:10px;margin-top:10px"><span style="font:800 26px var(--mono);color:var(--amber)">${esc(r.t)}</span>
     <span style="color:var(--sub);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name || r.issue || "")}</span></div>
   <div style="display:flex;align-items:center;gap:10px;margin:8px 0"><span style="font:800 30px var(--mono)">${r.score.toFixed(0)}</span>
@@ -514,8 +518,7 @@ function sqHtml(){
   if(st.sub === "sig") rows = rows.filter(r => (r.signals||[]).some(x => /급증|급등|잔고 \+/.test(x)));
   if(st.sub === "find"){ const q = st.q.trim().toUpperCase(); rows = q ? SQ.rows.filter(r => r.t.includes(q) || (r.name||"").toUpperCase().includes(q)) : []; }
   const sub = (k, l) => `<button class="tab ${st.sub===k?"on":""}" data-sqsub="${k}">${l}</button>`;
-  return `<button class="more" data-gotab="us" style="padding:12px 0 0">← 미국 수급</button>
-  <div class="sec" style="margin-top:6px">── SHORT SQUEEZE US</div>
+  return `
   <div class="hdesc" style="margin:8px 0;line-height:1.7">공매도 잔고 기준일 <b style="color:var(--ink)">${esc(SQ.si_date)}</b> · 일별 공매도 ${esc((SQ.regsho_date||"").replace(/(\d{4})(\d\d)(\d\d)/,"$1-$2-$3"))} · 계산 ${fmtTime(SQ.generated)}<br>
   공매도 잔고는 월 2회만 공개됩니다. 점수(0~100)는 숏커버 일수·잔고 증감·공매도 비중·거래량·주가·Reddit을 합친 <b style="color:var(--amber)">상대 순위</b>입니다. 유통주식수·대차 수수료는 미수집.</div>
   <div class="tabs" style="padding:0">${sub("rank","순위")}${sub("si","잔고")}${sub("sig","신호")}${sub("find","검색")}</div>
@@ -558,23 +561,35 @@ function pageHtml(){
   const all = HOME_SECTIONS.flatMap(x => x[2]);
   const it = all.find(x => x[0] === pgId) || ["", "", ""];
   const parent = HOME_SECTIONS[SEC_TABS[pgFrom]][1];
-  return `<button class="more" data-back="${pgFrom}" style="padding:12px 0 0">← ${esc(parent)}</button>
-    <div style="font:800 22px var(--mono);color:var(--amber);margin:12px 0 4px">${esc(it[1])}</div>
-    <div class="hdesc">${esc(it[2])}</div>
+  return `<div class="hdesc" style="margin-top:12px">${esc(it[2])}</div>
     <div class="sec">── 준비 중</div>
     <div class="linkcard" style="display:block;color:var(--sub);font-size:13.5px;line-height:1.7">${esc(PLAN[pgId] || "곧 추가됩니다.")}</div>`;
 }
-function render(){
-  const cur = (state.tab === "sq" || state.tab === "sqd") ? "us" : state.tab === "pg" ? pgFrom : state.tab;
+function winTitle(){
+  if(state.win === "pg"){ const it = HOME_SECTIONS.flatMap(x => x[2]).find(x => x[0] === pgId); return it ? it[1] : ""; }
+  if(state.win === "sqd") return sqSel + " · SHORT SQUEEZE";
+  return "SHORT SQUEEZE US";
+}
+function render(keepWinScroll = true){
+  const old = document.getElementById("winbody"), y = old && keepWinScroll ? old.scrollTop : 0;
+  renderBase();
+  if(state.win){
+    const body = state.win === "pg" ? pageHtml() : state.win === "sqd" ? sqDetailHtml() : sqHtml();
+    $("#feed").insertAdjacentHTML("beforeend", `<div id="win"><div class="winhead"><span>${esc(winTitle())}</span>
+      <button class="icon-btn" data-wclose="1" aria-label="닫기">✕</button></div><div id="winbody">${body}</div></div>`);
+    $("#winbody").scrollTop = y;
+  }
+  document.body.style.overflow = state.win ? "hidden" : "";
+}
+function openWin(w, scrollTop = 0){ state.win = w; render(false); if(scrollTop) $("#winbody").scrollTop = scrollTop; }
+function renderBase(){
+  const cur = state.tab;
   document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === cur));
   const onTab = document.querySelector("#tabs .tab.on"); onTab && onTab.scrollIntoView({inline:"nearest", block:"nearest"});
   if(!state.chip || !DATA.channels.some(c=>c.id===state.chip)) state.chip = DATA.channels[0].id;
   markSeen();
   renderChips();
   if(SEC_TABS[state.tab] != null){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = secListHtml(state.tab); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
-  if(state.tab === "pg"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = pageHtml(); return; }
-  if(state.tab === "sqd"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = sqDetailHtml(); return; }
-  if(state.tab === "sq"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = sqHtml(); return; }
   if(state.tab === "home"){ $("#feed").innerHTML = homeHtml(); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
   const list = state.tab === "report" ? DATA.posts.filter(p => p.report && !REPORT_EXCLUDE.includes(p.channel)) : postsFor(state.tab, state.chip);
   $("#feed").innerHTML = list.length
@@ -729,7 +744,7 @@ $("#feed").addEventListener("toggle", e => {
   const TABS = ["home", "telegram", "report", "macro", "kr", "us"];
   document.addEventListener("touchstart", e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, {passive:true});
   document.addEventListener("touchend", e => {
-    if(!DATA || $("#app").classList.contains("hidden") || !$("#sheet").classList.contains("hidden") || !$("#drawer").classList.contains("hidden")) return;
+    if(!DATA || state.win || $("#app").classList.contains("hidden") || !$("#sheet").classList.contains("hidden") || !$("#drawer").classList.contains("hidden")) return;
     if(e.target.closest(".chips,.photos,.sqf,input,textarea,.tabs")) return;
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     if(Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * .6 || Date.now() - st > 600) return;
@@ -739,7 +754,7 @@ $("#feed").addEventListener("toggle", e => {
       if(i >= 0 && i < ids.length){ state.chip = ids[i]; store.set("chip2", state.chip); render(); scrollTo(0,0);
         const on = document.querySelector(".chip.on"); on && on.scrollIntoView({inline:"center", block:"nearest", behavior:"smooth"}); return; }
     }
-    const base = (state.tab === "sq" || state.tab === "sqd") ? "us" : state.tab === "pg" ? pgFrom : state.tab, j = TABS.indexOf(base) + dir;
+    const base = state.tab, j = TABS.indexOf(base) + dir;
     if(j >= 0 && j < TABS.length){ state.tab = TABS[j]; store.set("tab2", state.tab);
       if(state.tab === "telegram") state.chip = dir > 0 ? DATA.channels[0].id : DATA.channels[DATA.channels.length-1].id;
       render(); scrollTo(0,0); }
@@ -766,7 +781,7 @@ $("#drawer").addEventListener("click", e => {
   if(kind === "tab"){ state.tab = x; store.set("tab2", x); render(); scrollTo(0,0); return; }
   if(kind === "rep"){ state.tab = "report"; store.set("tab2","report"); const f = store.get("fold", {}); f[x] = false; store.set("fold", f); render();
     setTimeout(() => { const el = document.getElementById("sec-" + x); el && scrollTo({top: el.getBoundingClientRect().top + scrollY - document.querySelector("header").offsetHeight - 8, behavior:"smooth"}); }, 300); return; }
-  if(kind === "pg"){ pgFrom = x; if(LIVE[y] === "sq"){ state.tab = "sq"; } else { pgId = y; state.tab = "pg"; } render(); scrollTo(0,0); return; }
+  if(kind === "pg"){ pgFrom = x; state.tab = x; store.set("tab2", x); if(LIVE[y] !== "sq") pgId = y; openWin(LIVE[y] === "sq" ? "sq" : "pg"); return; }
   if(kind === "home"){ state.tab = "home"; store.set("tab2","home"); const f = store.get("fold", {}); f[x] = false; store.set("fold", f); render();
     const el = document.getElementById("sec-" + x);
     if(el) scrollTo({top: el.getBoundingClientRect().top + scrollY - (document.querySelector("header").offsetHeight + 8), behavior:"smooth"});
@@ -777,14 +792,13 @@ $("#feed").addEventListener("input", e => {
 });
 $("#feed").addEventListener("click", e => {
   const pgb = e.target.closest("[data-pg]");
-  if(pgb){ const id = pgb.dataset.pg; pgFrom = state.tab;
-    if(LIVE[id] === "sq"){ state.tab = "sq"; } else { pgId = id; state.tab = "pg"; }
-    render(); scrollTo(0,0); return; }
+  if(pgb){ const id = pgb.dataset.pg; pgFrom = state.tab; if(LIVE[id] !== "sq") pgId = id; openWin(LIVE[id] === "sq" ? "sq" : "pg"); return; }
+  if(e.target.closest("[data-wclose]")){ state.win = null; render(false); return; }
   const bk = e.target.closest("[data-back]");
   if(bk){ state.tab = bk.dataset.back; store.set("tab2", state.tab); render(); scrollTo(0,0); return; }
   const sd = e.target.closest("[data-sqd]");
-  if(sd){ sqSel = sd.dataset.sqd; state.tab = "sqd"; sqScroll = scrollY; render(); scrollTo(0,0); return; }
-  if(e.target.closest("[data-sqback]")){ state.tab = "sq"; render(); scrollTo(0, sqScroll || 0); return; }
+  if(sd){ sqSel = sd.dataset.sqd; sqScroll = $("#winbody") ? $("#winbody").scrollTop : 0; openWin("sqd"); return; }
+  if(e.target.closest("[data-sqback]")){ openWin("sq", sqScroll); return; }
   const sr = e.target.closest("[data-sqt]");
   if(sr && !e.target.closest("a,button")){ const t = sr.dataset.sqt; sqOpen.has(t) ? sqOpen.delete(t) : sqOpen.add(t); render(); return; }
   const sb = e.target.closest("[data-sqsub]"); if(sb){ sqState.sub = sb.dataset.sqsub; store.set("sq", sqState); render(); return; }
@@ -835,7 +849,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795759030";
+const APP_VERSION = "1795759221";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
