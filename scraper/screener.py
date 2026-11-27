@@ -173,6 +173,9 @@ def run():
     passed = sorted([x for x in res if x["fund"] and x["cross"]], key=lambda x: (-x["pts"], x["cross"], -x["mv"]))
     near = sorted([x for x in res if x["fund"] and x["near"]], key=lambda x: -x["mv"])[:30]
     slim = lambda x: {k: x[k] for k in ("c", "near", "cross")}
+    keep = ("c", "rsi", "sig", "cross", "near", "fund", "fund_t", "op", "q", "volx", "div", "cu", "cd", "du", "dd", "pts", "why", "wk")
+    json.dump({"generated": now.isoformat(timespec="minutes"), "rows": {x["c"]: {k: x[k] for k in keep} for x in res}},
+              open(os.path.join(ROOT, "docs", "scr_all.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     json.dump({"generated": now.isoformat(timespec="minutes"), "universe": len(uni), "filled": len(res),
                "passed": passed, "near": near, "all": [slim(x) for x in res]}, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
     print(f"[SCR] 대상 {len(uni)} · 판정 {len(res)} · 갱신 {len(todo)} · 통과 {len(passed)} · 근접 {len(near)} · {time.time() - t0:.0f}초")

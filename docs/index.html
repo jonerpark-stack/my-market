@@ -519,7 +519,20 @@ const HOME_SECTIONS = [
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
 const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1, fg: 1, reddit: 1};
-let watch = store.get("watch", []), wq = "", wOpen = null, SCR = null, scrLoading = false, scrNear = false;
+let watch = store.get("watch", []), wq = "", wOpen = null, SCR = null, scrLoading = false, scrNear = false, SCA = null, scaLoading = false;
+async function loadSCA(){ if(scaLoading) return; scaLoading = true; try{ const r = await fetch("scr_all.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ SCA = await r.json(); if(state.tab === "home") render(); } }catch(e){} }
+function chartHtml(c, y){
+  if(!SCA){ loadSCA(); return `<div class="hdesc">차트 분석 불러오는 중…</div>`; }
+  const x = (SCA.rows || {})[c];
+  if(!x) return `<div class="hdesc" style="margin:4px 0">${y && y[3] < 1000 ? "시총 1,000억 미만이라 차트 분석 대상이 아닙니다." : "차트 분석 대기 중 (수집 때마다 순서대로 채워집니다)."}</div>`;
+  const tag = (t, col) => `<span style="font-size:11px;border:1px solid ${col};color:${col};border-radius:4px;padding:0 4px;margin:2px 3px 0 0;display:inline-block">${esc(t)}</span>`;
+  const st = x.cross ? tag(`주봉 RSI 시그널 상향 돌파(${x.cross === 1 ? "이번 주" : "지난주"})`, "var(--amber)") : x.near ? tag("돌파 임박 (시그널 2pt 아래·상승 중)", "var(--amber)") : x.rsi > x.sig ? tag("RSI 시그널 위 (상승 흐름 유지)", "#9ccc65") : tag("RSI 시그널 아래", "var(--sub)");
+  const ops = (x.op || []).map(v => v == null ? "-" : Math.round(v).toLocaleString()).join(" → ");
+  return `<div style="margin:2px 0 6px"><div style="font-size:12.5px;margin-bottom:3px"><b>📈 차트·실적 분석</b> <span style="color:var(--sub)">주봉 RSI ${x.rsi} · 시그널 ${x.sig} · 거래량 ${x.volx}배</span></div>
+    ${st}${x.fund ? tag(x.fund_t, "#9ccc65") : tag("실적 관문 미통과", "var(--sub)")}${x.div ? tag("주봉 상승 다이버전스", "var(--amber)") : ""}
+    ${[...x.cu.map(n => "주봉 " + n), ...x.du.map(n => "일봉 " + n)].map(n => tag(n, "#f87171")).join("")}${[...x.cd.map(n => "주봉 " + n), ...x.dd.map(n => "일봉 " + n)].map(n => tag("⚠ " + n, "#60a5fa")).join("")}
+    ${ops ? `<div class="hdesc" style="margin-top:3px">분기 영업이익(억원): ${ops}</div>` : ""}${x.fund && x.cross ? `<div style="font-size:12px;color:var(--amber);margin-top:2px">✔ 스크리너 통과</div>` : ""}</div>`;
+}
 const watchAuto = new Set(store.get("watchAuto", [])), watchOff = new Set(store.get("watchOff", []));
 async function loadSCR(){ if(scrLoading) return; scrLoading = true; try{ const r = await fetch("screener.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ SCR = await r.json();
   for(const x of SCR.passed || []) if(!watch.includes(x.c) && !watchOff.has(x.c)){ watch.push(x.c); watchAuto.add(x.c); }
@@ -552,7 +565,7 @@ function watchHtml(){
       <div style="flex:1;min-width:0"><b>${esc(y[1])}</b>${sx ? ` <span style="font-size:10.5px;background:var(--amber);color:#111;border-radius:3px;padding:0 4px">스크리너${auto ? " 자동" : ""}</span>` : ""} <span style="color:var(--sub);font-size:11.5px">${y[0]} · ${esc(SEC2GRP[y[5]] || y[5] || "")}</span>
       <div style="font-size:11.5px;color:var(--sub);margin-top:2px">${ds.length ? `<span style="color:var(--amber)">공시 ${ds.length}</span> · ` : ""}${rs.length ? `<span style="color:var(--amber)">리포트 ${rs.length}</span> · ` : ""}시총 ${y[3] >= 10000 ? (y[3] / 10000).toFixed(1) + "조" : Math.round(y[3]).toLocaleString() + "억"}</div></div>
       <b style="color:${fcol(y[2])}">${sgnp(y[2])}</b><button class="rpb" data-wdel="${y[0]}" aria-label="삭제" style="width:28px;height:28px;font-size:13px">✕</button></div>
-      ${open ? `<div style="padding:0 0 10px 8px;border-left:2px solid var(--amber);margin-bottom:8px">${sx ? scrRow(sx).replace("border-bottom:1px solid var(--line)", "") : ""}
+      ${open ? `<div style="padding:0 0 10px 8px;border-left:2px solid var(--amber);margin-bottom:8px">${chartHtml(y[0], y)}
         ${ds.slice(0, 6).map(x => `<a data-dart="${x.rno}" href="#" style="display:block;font-size:12.5px;color:var(--ink);text-decoration:none;padding:3px 0">📄 ${x.dt.slice(4,6)}/${x.dt.slice(6)} ${esc(x.nm)}${dartSummary(x) ? ` <span style="color:var(--sub)">· ${dartSummary(x)}</span>` : ""}</a>`).join("") || `<div class="hdesc">최근 30일 주요 공시 없음</div>`}
         ${rs.slice(0, 5).map(x => `<div data-rp="${x.id}" style="font-size:12.5px;padding:3px 0;cursor:pointer">📑 ${esc(x.broker || "")} · ${esc(x.title || "")}</div>`).join("")}
         <a href="https://m.stock.naver.com/domestic/stock/${y[0]}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--sub)">네이버 종목 화면 ›</a></div>` : ""}</div>`;
@@ -1438,7 +1451,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795784728";
+const APP_VERSION = "1795785055";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
