@@ -1,5 +1,5 @@
 """Reddit 화제 종목 (ApeWisdom) → docs/reddit.json"""
-import os, json, datetime as dt, urllib.request
+import os, json, html, datetime as dt, urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "reddit.json")
 KST = dt.timezone(dt.timedelta(hours=9))
@@ -14,7 +14,7 @@ def run():
             print("[REDDIT] 실패", e); break
         for r in j.get("results", []):
             i = lambda k: int(r.get(k) or 0)
-            rows.append({"t": r["ticker"], "n": r.get("name", ""), "rank": i("rank"), "rank24": i("rank_24h_ago"),
+            rows.append({"t": r["ticker"], "n": html.unescape(r.get("name", "")), "rank": i("rank"), "rank24": i("rank_24h_ago"),
                          "m": i("mentions"), "m24": i("mentions_24h_ago"), "up": i("upvotes")})
     if rows:
         json.dump({"generated": dt.datetime.now(KST).isoformat(timespec="minutes"), "rows": rows}, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
