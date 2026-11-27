@@ -89,11 +89,33 @@ def src_generic(house, series, base, pattern):
     return out[-6:]
 
 
+def src_gs():
+    xml = _get("https://www.goldmansachs.com/sitemap-1.xml", timeout=60)[0]
+    if xml[:2] == b"\x1f\x8b":
+        import gzip
+        xml = gzip.decompress(xml)
+    xml = xml.decode("utf-8", "replace")
+    ent = []
+    for blk in re.findall(r"<url>(.*?)</url>", xml, re.S):
+        loc = re.search(r"<loc>([^<]+)</loc>", blk)
+        if not loc or "/insights/top-of-mind/" not in loc.group(1):
+            continue
+        lm = re.search(r"<lastmod>([^<]+)</lastmod>", blk)
+        ent.append((lm.group(1)[:10] if lm else "", loc.group(1).strip()))
+    ent.sort()
+    out = []
+    for d, u in ent[-4:]:
+        slug = u.rstrip("/").rsplit("/", 1)[-1]
+        out.append({"id": "gs-" + slug[:60], "house": "Goldman Sachs", "series": "Top of Mind",
+                    "title": slug.replace("-", " ").capitalize(), "date": d, "url": u, "pdf": False})
+    return out
+
+
 SOURCES = [
     ("BlackRock", src_blackrock),
     ("J.P. Morgan", src_jpm),
     ("Fed", src_fed),
-    ("Goldman Sachs", lambda: src_generic("Goldman Sachs", "Top of Mind", "https://www.goldmansachs.com/insights/top-of-mind", r"top.?of.?mind")),
+    ("Goldman Sachs", src_gs),
     ("Vanguard", lambda: src_generic("Vanguard", "Economic & Market Outlook",
                                      "https://corporate.vanguard.com/content/corporatesite/us/en/corp/vemo/vemo-return-forecasts.html", r"outlook|vemo|forecast")),
     ("State Street", lambda: src_generic("State Street GA", "Insights", "https://www.ssga.com/us/en/institutional/insights", r"outlook|market|macro")),
