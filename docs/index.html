@@ -102,6 +102,13 @@ details.fold:not([open]) .fa{transform:rotate(-90deg)}
 .winhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line);font:800 15px var(--mono);color:var(--amber)}
 .winhead span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #winbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(30px + env(safe-area-inset-bottom))}
+#pdfwin{position:fixed;inset:0;z-index:35;background:#1a1a1a;display:flex;flex-direction:column}
+#pdfbody{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px 0 30px}
+#pdfbody canvas{display:block;margin:0 auto 8px;background:#fff;max-width:100%}
+.pdfmsg{color:var(--sub);text-align:center;padding:40px 20px;font-size:14px;line-height:1.7}
+.pdfpw{max-width:320px;margin:40px auto;padding:0 20px;display:flex;flex-direction:column;gap:10px}
+.pdfpw input{padding:13px;border-radius:6px;border:1px solid #333;background:var(--bg);color:var(--ink);font-size:16px}
+.pdfpw button{padding:13px;border:0;border-radius:6px;background:var(--amber);color:#1a1200;font-weight:800}
 #drawer{position:fixed;inset:0;z-index:40;display:flex}
 #drawer .dbg{position:absolute;inset:0;background:rgba(0,0,0,.6)}
 #drawer nav{position:relative;width:min(82vw,340px);height:100%;overflow-y:auto;background:#111;border-right:1px solid #333;padding:calc(16px + env(safe-area-inset-top)) 0 30px}
@@ -216,6 +223,8 @@ details.ai summary .hint{color:var(--sub)}
   </div>
 </div>
 <div id="toast" class="hidden"></div>
+<div id="pdfwin" class="hidden"><div class="winhead"><span id="pdftitle"></span><button class="icon-btn" id="pdfclose" aria-label="닫기">✕</button></div>
+  <div id="pdfbody"></div></div>
 <div id="drawer" class="hidden"><div class="dbg"></div><nav id="dnav" aria-label="목차"></nav></div>
 
 <script>
@@ -366,6 +375,63 @@ function krHtml(){
     ${rpOpen ? `<div class="rplist">${secs.map(k => `<div class="rpopt" data-rpsec="${esc(k)}"><span>${esc(k)}</span><span style="color:${unread[k] ? "var(--amber)" : "var(--sub)"}">${unread[k] ? "새 " + unread[k] : "✓"} · ${cnt[k]}</span></div>`).join("")}</div>` : ""}</div>
     ${saved.length ? `<div class="rpsub">★ 저장한 리포트 (${saved.length})</div>${saved.map(rpItem).join("")}` : ""}
     ${rpSector ? `<div class="rpsub">${esc(rpSector)} · ${list.length}건</div>${list.map(rpItem).join("")}` : `<div class="hdesc" style="margin:12px 0">섹터를 선택하면 리포트가 나옵니다. 누르면 텔레그램에서 PDF가 열립니다.</div>`}`;
+}
+/* ---------- 사이트 안 PDF 뷰어 (암호화된 파일을 기기 안에서 복호화) ---------- */
+let pdfKey = null, pdfLib = null, pdfToken = 0;
+function loadScript(src){ return new Promise((ok, no) => { const sc = document.createElement("script"); sc.src = src; sc.onload = ok; sc.onerror = no; document.head.appendChild(sc); }); }
+async function getPdfLib(){
+  if(pdfLib) return pdfLib;
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  return pdfLib = window.pdfjsLib;
+}
+async function deriveKey(pw){
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2", salt:b64(RP.kdf_salt), iterations:RP.kdf_iter || 200000, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+}
+async function decryptPdf(buf, key){
+  const u = new Uint8Array(buf);
+  if(String.fromCharCode(...u.slice(0,4)) !== "JPR1") throw new Error("형식 오류");
+  return crypto.subtle.decrypt({name:"AES-GCM", iv:u.slice(4,16)}, key, u.slice(16));
+}
+function closePdf(){ pdfToken++; $("#pdfwin").classList.add("hidden"); $("#pdfbody").innerHTML = ""; document.body.style.overflow = state.win ? "hidden" : ""; }
+$("#pdfclose").addEventListener("click", closePdf);
+function askPw(x, msg){
+  $("#pdfbody").innerHTML = `<form class="pdfpw" id="pdfpwf"><div class="pdfmsg" style="padding:0 0 6px">${msg || "리포트 비밀번호를 입력하세요.<br>처음 한 번만 입력하면 이 기기에 기억됩니다."}</div>
+    <input type="password" id="pdfpwi" placeholder="REPORT_PASSWORD" autocomplete="current-password"><button>열기</button></form>`;
+  $("#pdfpwf").addEventListener("submit", async ev => { ev.preventDefault(); const pw = $("#pdfpwi").value; if(!pw) return;
+    $("#pdfbody").innerHTML = `<div class="pdfmsg">확인 중…</div>`;
+    try{ pdfKey = await deriveKey(pw); store.set("rpPw", pw); showPdf(x); }catch(e){ askPw(x, "비밀번호를 확인하지 못했습니다."); } });
+}
+async function openPdf(x){
+  $("#pdftitle").textContent = (x.broker ? x.broker + " · " : "") + (x.target || x.title || "");
+  $("#pdfwin").classList.remove("hidden"); document.body.style.overflow = "hidden";
+  if(!pdfKey){ const pw = store.get("rpPw", null); if(!pw){ askPw(x); return; } pdfKey = await deriveKey(pw); }
+  showPdf(x);
+}
+async function showPdf(x){
+  const my = ++pdfToken, body = $("#pdfbody");
+  body.innerHTML = `<div class="pdfmsg">불러오는 중…${x.size ? `<br>${(x.size/1048576).toFixed(1)}MB` : ""}</div>`;
+  try{
+    const [lib, buf] = await Promise.all([getPdfLib(), fetch(x.enc, {cache:"force-cache"}).then(r => { if(!r.ok) throw new Error("파일 없음 " + r.status); return r.arrayBuffer(); })]);
+    let data;
+    try{ data = await decryptPdf(buf, pdfKey); }
+    catch(e){ pdfKey = null; store.del("rpPw"); askPw(x, "비밀번호가 맞지 않습니다. 다시 입력하세요."); return; }
+    const doc = await lib.getDocument({data: new Uint8Array(data)}).promise;
+    if(my !== pdfToken) return;
+    body.innerHTML = `<div class="pdfmsg" style="padding:4px 0 8px;font-size:12px">${doc.numPages}쪽 · 두 손가락으로 확대</div>`;
+    const W = body.clientWidth - 8, dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    for(let i = 1; i <= doc.numPages; i++){
+      if(my !== pdfToken) return;
+      const page = await doc.getPage(i), vp0 = page.getViewport({scale:1}), sc = W / vp0.width, vp = page.getViewport({scale: sc * dpr});
+      const cv = document.createElement("canvas"); cv.width = vp.width; cv.height = vp.height; cv.style.width = (vp.width/dpr) + "px";
+      body.appendChild(cv);
+      await page.render({canvasContext: cv.getContext("2d"), viewport: vp}).promise;
+    }
+  }catch(e){
+    if(my === pdfToken) body.innerHTML = `<div class="pdfmsg">열지 못했습니다 (${esc(e.message)}).<br><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:var(--amber)">텔레그램에서 열기</a></div>`;
+  }
 }
 let FR = null;
 async function loadFR(){
@@ -875,7 +941,7 @@ $("#feed").addEventListener("toggle", e => {
   const TABS = ["home", "telegram", "report", "macro", "kr", "us"];
   document.addEventListener("touchstart", e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, {passive:true});
   document.addEventListener("touchend", e => {
-    if(!DATA || state.win || $("#app").classList.contains("hidden") || !$("#sheet").classList.contains("hidden") || !$("#drawer").classList.contains("hidden")) return;
+    if(!DATA || state.win || !$("#pdfwin").classList.contains("hidden") || $("#app").classList.contains("hidden") || !$("#sheet").classList.contains("hidden") || !$("#drawer").classList.contains("hidden")) return;
     if(e.target.closest(".chips,.photos,.sqf,input,textarea,.tabs")) return;
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     if(Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * .6 || Date.now() - st > 600) return;
@@ -927,7 +993,8 @@ $("#feed").addEventListener("click", e => {
   const sv = e.target.closest("[data-rpsave]"); if(sv){ const id = +sv.dataset.rpsave; rpSaved.has(id) ? rpSaved.delete(id) : rpSaved.add(id); store.set("rpSaved", [...rpSaved]); render(); return; }
   const ck = e.target.closest("[data-rpread]"); if(ck){ const id = +ck.dataset.rpread; rpRead.has(id) ? rpRead.delete(id) : rpRead.add(id); store.set("rpRead", [...rpRead]); render(); return; }
   const ri = e.target.closest("[data-rp]");
-  if(ri){ const id = +ri.dataset.rp, x = RP.items.find(y => y.id === id); rpRead.add(id); store.set("rpRead", [...rpRead]); render(); if(x) window.open(x.url, "_blank"); return; }
+  if(ri){ const id = +ri.dataset.rp, x = RP.items.find(y => y.id === id); rpRead.add(id); store.set("rpRead", [...rpRead]); render();
+    if(x && x.enc) openPdf(x); else if(x) window.open(x.url, "_blank"); return; }
   const pgb = e.target.closest("[data-pg]");
   if(pgb){ const id = pgb.dataset.pg;
     if(pgb.dataset.ptab){ state.tab = pgb.dataset.ptab; store.set("tab2", state.tab); scrollTo(0,0); }  // 홈에서 누르면 해당 탭으로 이동 후 창 열기
@@ -988,7 +1055,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795770226";
+const APP_VERSION = "1795770534";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});

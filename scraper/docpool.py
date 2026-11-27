@@ -16,6 +16,82 @@ SECTORS = ["반도체", "IT하드웨어·디스플레이", "2차전지", "자동
            "바이오·헬스케어", "화장품·소비재", "유통·음식료", "운송·물류", "지주·기타", "해외주식", "매크로·전략·산업"]
 
 
+UPLOAD_PER_RUN = 60
+MAX_PDF_MB = 40
+KDF_ITER = 200_000
+
+
+def r2_client():
+    need = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "R2_PUBLIC_URL", "REPORT_PASSWORD")
+    if not all(os.environ.get(k) for k in need):
+        return None
+    import boto3
+    return boto3.client("s3", endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+                        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+                        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"], region_name="auto")
+
+
+def enc_key(salt: bytes) -> bytes:
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    return PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=KDF_ITER).derive(
+        os.environ["REPORT_PASSWORD"].encode())
+
+
+def upload_pdfs(items, meta):
+    """PDF를 비밀번호로 암호화(AES-GCM)해 R2에 저장. 공개 주소로 받아도 비밀번호 없이는 못 읽음."""
+    s3 = r2_client()
+    if not s3:
+        print("[DOC] R2 설정 없음 → PDF 저장 건너뜀")
+        return
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    import base64
+    if not meta.get("kdf_salt"):
+        meta["kdf_salt"] = base64.b64encode(os.urandom(16)).decode()
+    key = enc_key(base64.b64decode(meta["kdf_salt"]))
+    meta["kdf_iter"] = KDF_ITER
+    todo = [x for x in items if x.get("file") and not x.get("enc") and not x.get("skip") and not x.get("too_big")][:UPLOAD_PER_RUN]
+    if not todo:
+        return
+    from telethon.sync import TelegramClient
+    from telethon.sessions import StringSession
+    bucket, pub = os.environ["R2_BUCKET"], os.environ["R2_PUBLIC_URL"].rstrip("/")
+    ok = 0
+    with TelegramClient(StringSession(os.environ["TG_SESSION"]), int(os.environ["TG_API_ID"]), os.environ["TG_API_HASH"]) as c:
+        msgs = c.get_messages(CHANNEL, ids=[x["id"] for x in todo])
+        for x, m in zip(todo, msgs):
+            try:
+                if not m or not m.document or m.document.size > MAX_PDF_MB * 1024 * 1024:
+                    x["too_big"] = True
+                    continue
+                data = c.download_media(m, file=bytes)
+                iv = os.urandom(12)
+                blob = b"JPR1" + iv + AESGCM(key).encrypt(iv, data, None)
+                k = f"reports/{x['id']}.bin"
+                s3.put_object(Bucket=bucket, Key=k, Body=blob, ContentType="application/octet-stream")
+                x["enc"] = f"{pub}/{k}"
+                x["size"] = len(data)
+                ok += 1
+            except Exception as e:
+                print(f"[DOC] 업로드 실패 {x['id']}: {e}", file=sys.stderr)
+    print(f"[DOC] PDF 암호화 저장 {ok}/{len(todo)}건")
+
+
+def r2_cleanup(keep_ids):
+    s3 = r2_client()
+    if not s3:
+        return
+    bucket = os.environ["R2_BUCKET"]
+    try:
+        resp = s3.list_objects_v2(Bucket=bucket, Prefix="reports/")
+        for o in resp.get("Contents", []):
+            rid = o["Key"].split("/")[-1].split(".")[0]
+            if rid.isdigit() and int(rid) not in keep_ids:
+                s3.delete_object(Bucket=bucket, Key=o["Key"])
+    except Exception as e:
+        print(f"[DOC] 정리 실패: {e}", file=sys.stderr)
+
+
 def collect(last_id):
     from telethon.sync import TelegramClient
     from telethon.sessions import StringSession
@@ -116,8 +192,29 @@ def run():
         items[x["id"]] = x
     cutoff = (datetime.now(KST) - timedelta(days=KEEP_DAYS)).isoformat()
     lst = sorted((x for x in items.values() if x["date"] >= cutoff and not x.get("skip")), key=lambda x: x["id"], reverse=True)
-    OUT.write_text(json.dumps({"generated": datetime.now(KST).isoformat(timespec="seconds"), "sectors": SECTORS, "items": lst},
-                              ensure_ascii=False))
+    # 중복 제거: 같은 파일명 또는 같은 증권사+제목이면 하나만 남김 (PDF가 이미 저장된 것 우선, 그다음 먼저 올라온 것)
+    norm = lambda v: re.sub(r"[\s_\-.,·()\[\]]+", "", (v or "").lower())
+    seen, uniq = {}, []
+    for x in sorted(lst, key=lambda x: (not x.get("enc"), x["id"])):
+        keys = [k for k in ("f:" + norm(x.get("file")) if x.get("file") else None,
+                            "t:" + norm(x.get("broker")) + norm(x.get("title")) if x.get("title") else None) if k and len(k) > 6]
+        if any(k in seen for k in keys):
+            continue
+        for k in keys:
+            seen[k] = 1
+        uniq.append(x)
+    if len(uniq) != len(lst):
+        print(f"[DOC] 중복 {len(lst) - len(uniq)}건 제거")
+    lst = sorted(uniq, key=lambda x: x["id"], reverse=True)
+    meta = {k: old.get(k) for k in ("kdf_salt", "kdf_iter") if old.get(k)}
+    try:
+        upload_pdfs(lst, meta)
+        if datetime.now(KST).hour == 4:
+            r2_cleanup({x["id"] for x in lst})
+    except Exception as e:
+        print(f"[DOC] PDF 처리 오류: {e}", file=sys.stderr)
+    OUT.write_text(json.dumps({"generated": datetime.now(KST).isoformat(timespec="seconds"), "sectors": SECTORS,
+                               **meta, "items": lst}, ensure_ascii=False))
     print(f"[DOC] 신규 {len(new)}건 · 보관 {len(lst)}건 · 분류 {len(cls)}건")
 
 
