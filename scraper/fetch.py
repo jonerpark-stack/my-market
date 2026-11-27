@@ -171,7 +171,11 @@ def _parse_ai_json(s: str) -> dict | None:
 
 
 def ai_comment(post: dict, channel_name: str) -> dict | None:
-    provider = os.environ.get("AI_PROVIDER", "openai").lower()
+    provider = (os.environ.get("AI_PROVIDER") or "").lower()
+    # Gemini 키만 있으면 자동으로 Gemini 사용 (OpenAI 키가 없을 때)
+    if provider in ("", "openai") and not os.environ.get("OPENAI_API_KEY") and os.environ.get("GEMINI_API_KEY"):
+        provider = "gemini"
+    provider = provider or "openai"
     prompt = (AI_PROMPT.replace("{channel}", channel_name)
               .replace("{date}", post["date"][:16])
               .replace("{text}", post["text"][:6000]))

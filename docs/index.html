@@ -3,96 +3,92 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#0a0a0a">
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>내 시황</title>
 <style>
+/* 터미널형: 검정 바탕, 앰버 강조, 상승 빨강/하락 파랑, 고정폭 숫자 */
 :root{
-  --bg:#f4f5f7; --card:#fff; --ink:#111827; --sub:#6b7280; --line:#e5e7eb;
-  --accent:#2563eb; --accent-ink:#fff; --up:#dc2626; --down:#2563eb;
-  --ai:#f5f3ff; --ai-line:#ddd6fe; --hl:#fef08a; --kakao:#fee500;
-}
-@media (prefers-color-scheme: dark){
-  :root{ --bg:#0b1020; --card:#151b2e; --ink:#e5e7eb; --sub:#94a3b8; --line:#263049;
-    --accent:#3b82f6; --ai:#1e1b3a; --ai-line:#3b3470; --hl:#a16207; --up:#f87171; --down:#60a5fa; }
+  --bg:#0a0a0a; --panel:#111; --ink:#d9d9d9; --sub:#7a7a7a; --line:#222;
+  --amber:#ffb000; --amber-ink:#1a1200; --up:#ff5f56; --down:#4da3ff; --ai:#9be39b; --kakao:#fee500;
+  --mono:"JetBrains Mono","D2Coding",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);
-  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
 button{font:inherit;color:inherit;cursor:pointer}
 .hidden{display:none!important}
+.mono{font-family:var(--mono)}
 
-/* 잠금 화면 */
 #lock{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:14px}
-#lock h1{margin:0;font-size:24px}
-#lock input{width:100%;max-width:320px;padding:14px;border-radius:12px;border:1px solid var(--line);
-  background:var(--card);color:var(--ink);font-size:16px}
+#lock h1{margin:0;font-size:22px;font-family:var(--mono);color:var(--amber)}
+#lock input{width:100%;max-width:320px;padding:14px;border-radius:6px;border:1px solid #333;background:var(--panel);color:var(--ink);font-size:16px}
 #lock label{font-size:14px;color:var(--sub)}
-.btn-primary{width:100%;max-width:320px;padding:14px;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn-primary{width:100%;max-width:320px;padding:14px;border:0;border-radius:6px;background:var(--amber);color:var(--amber-ink);font-weight:800}
 #lockMsg{color:var(--up);font-size:14px;min-height:20px}
 
-/* 헤더 + 2단 탭 */
-header{position:sticky;top:0;z-index:10;background:var(--bg);padding-top:env(safe-area-inset-top)}
+header{position:sticky;top:0;z-index:10;background:var(--bg);padding-top:env(safe-area-inset-top);border-bottom:1px solid var(--line)}
 .top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 6px}
-.top h1{margin:0;font-size:20px}
-.top .meta{display:flex;align-items:center;gap:6px;color:var(--sub);font-size:13px}
-.icon-btn{border:0;background:var(--card);border-radius:10px;width:38px;height:38px;font-size:17px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
-.tabs{display:flex;gap:6px;padding:6px 16px}
-.tab{flex:1;border:0;border-radius:12px;padding:11px 8px;background:var(--card);font-weight:700;color:var(--sub)}
-.tab.on{background:var(--accent);color:var(--accent-ink)}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 16px 10px;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.top h1{margin:0;font:800 17px var(--mono);color:var(--amber);letter-spacing:.5px}
+.top .meta{display:flex;align-items:center;gap:6px;color:var(--sub);font:12px var(--mono)}
+.icon-btn{border:1px solid #333;background:transparent;border-radius:6px;width:36px;height:36px;font-size:15px}
+.tabs{display:flex;gap:0;padding:4px 16px 0}
+.tab{flex:1;border:0;background:none;padding:9px 0;font:700 14px var(--mono);color:var(--sub);border-bottom:2px solid #222}
+.tab.on{color:var(--amber);border-bottom-color:var(--amber)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 12px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-size:14px;white-space:nowrap;position:relative}
-.chip.on{border-color:var(--accent);color:var(--accent);font-weight:700}
-.badge{display:inline-block;min-width:18px;height:18px;line-height:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--up);color:#fff;font-size:11px;text-align:center;font-weight:700}
+.chip{flex:none;border:1px solid #333;background:transparent;border-radius:4px;padding:6px 12px;font-size:13px;font-weight:700;white-space:nowrap}
+.chip.on{background:var(--amber);border-color:var(--amber);color:var(--amber-ink)}
+.badge{display:inline-block;min-width:16px;height:16px;line-height:16px;padding:0 4px;margin-left:6px;border-radius:3px;background:var(--up);color:#fff;font:700 10px var(--mono);text-align:center}
 
-/* 피드 */
-main{padding:12px 12px calc(40px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
-.card{background:var(--card);border-radius:16px;padding:14px 14px 10px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.card-h{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);margin-bottom:8px}
-.card-h b{color:var(--ink)}
-.new{background:var(--up);color:#fff;border-radius:6px;padding:0 6px;font-size:11px;font-weight:700}
-.fwd{font-size:12px;color:var(--sub);margin-bottom:4px}
-.body{white-space:pre-wrap;word-break:break-word;overflow:hidden}
-.body.clamp{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical}
-.body a{color:var(--accent)}
-mark{background:var(--hl);color:inherit;border-radius:3px;padding:0 2px}
-.more{border:0;background:none;color:var(--accent);padding:6px 0;font-size:14px}
-.photos{display:flex;gap:6px;margin-top:8px;overflow-x:auto}
-.photos img{height:120px;border-radius:10px;flex:none}
-.docs{margin-top:8px;font-size:14px}
-.docs div{padding:8px 10px;border:1px dashed var(--line);border-radius:10px;margin-top:4px}
-details.ai{margin-top:10px;background:var(--ai);border:1px solid var(--ai-line);border-radius:12px;padding:0 12px}
-details.ai summary{padding:10px 0;font-weight:700;font-size:14px;list-style:none}
+main{padding:0 16px calc(40px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
+.sec{margin:18px 0 0;padding:6px 0;font:700 12px var(--mono);color:var(--sub);border-bottom:1px dashed #333;letter-spacing:.5px}
+.card{padding:14px 0 14px;border-bottom:1px solid var(--line)}
+.card-h{display:flex;align-items:center;gap:8px;font:700 12px var(--mono);color:var(--amber);letter-spacing:.3px}
+.card-h .nm{color:var(--ink);font-family:inherit}
+.new{background:var(--up);color:#fff;border-radius:3px;padding:0 5px;font-size:10px}
+.fwd{font-size:12px;color:var(--sub);margin-top:4px}
+.ticks{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;margin:10px 0 2px;font:13px/1.5 var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.ticks .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ticks .u{color:var(--up);text-align:right} .ticks .d{color:var(--down);text-align:right}
+.body{white-space:pre-wrap;word-break:break-word;overflow:hidden;margin-top:8px;font-size:14.5px;color:#c8c8c8}
+.body.clamp{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}
+.body a{color:var(--down)}
+.linkcard{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 12px;border:1px solid #333;border-radius:6px;color:var(--ink);text-decoration:none;font-size:14px}
+.linkcard span{color:var(--sub);font:12px var(--mono)}
+.more{border:0;background:none;color:var(--amber);padding:6px 0 0;font:700 13px var(--mono)}
+.photos{display:flex;gap:6px;margin-top:10px;overflow-x:auto}
+.photos img{height:110px;border-radius:6px;flex:none}
+.docs{margin-top:8px;font-size:13px}
+.docs div{padding:7px 10px;border:1px dashed #333;border-radius:6px;margin-top:4px}
+details.ai{margin-top:10px}
+details.ai summary{list-style:none;cursor:pointer;font:13px/1.5 var(--mono);color:var(--ai)}
 details.ai summary::-webkit-details-marker{display:none}
-details.ai summary::after{content:" ▸";color:var(--sub)}
-details.ai[open] summary::after{content:" ▾"}
-.ai-body{padding-bottom:10px;font-size:14px}
-.ai-body p{margin:0 0 6px}
-.ai-body .note{font-size:12px;color:var(--sub);margin-top:6px}
-.actions{display:flex;gap:8px;margin-top:10px}
-.act{flex:1;border:0;border-radius:10px;padding:11px;font-weight:700;font-size:14px;text-align:center;text-decoration:none}
-.act.kakao{background:var(--kakao);color:#191919}
-.act.link{background:var(--bg);color:var(--ink)}
-.empty{text-align:center;color:var(--sub);padding:60px 0}
+details.ai summary .hint{color:var(--sub)}
+.ai-body{font-size:13.5px;padding:6px 0 0 14px;color:#b9d9b9;border-left:1px solid #2a4a2a;margin-top:6px}
+.ai-body p{margin:0 0 5px}
+.ai-body .note{font-size:11px;color:var(--sub);margin-top:6px}
+.tags{margin-top:8px;color:var(--amber);font:12px var(--mono);opacity:.85}
+.actions{display:flex;gap:8px;margin-top:12px}
+.act{flex:1;border:1px solid #333;border-radius:6px;padding:9px;font:700 13px var(--mono);text-align:center;text-decoration:none;background:transparent;color:var(--ink)}
+.act.kakao{background:var(--kakao);border-color:var(--kakao);color:#191919}
+.empty{text-align:center;color:var(--sub);padding:60px 0;font-family:var(--mono)}
+.rep{display:block;padding:12px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
+.rep .t{font-weight:700;font-size:15px;margin:2px 0}
+.rep .s{font:12px var(--mono);color:var(--sub)}
 
-/* 리포트 */
-.rep{display:block;background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:8px;color:inherit;text-decoration:none}
-.rep .t{font-weight:700;margin:2px 0}
-.rep .s{font-size:13px;color:var(--sub)}
-
-/* 공유 시트 */
-#sheet{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:flex-end}
-.sheet-in{background:var(--card);width:100%;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
-.sheet-in h2{margin:0 0 10px;font-size:17px}
-.sheet-in textarea{width:100%;min-height:200px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);color:var(--ink);font-family:inherit;font-size:14px;line-height:1.5}
-.opts{display:flex;gap:16px;margin:10px 0;font-size:14px}
-#chartWrap img{width:100%;border-radius:12px;border:1px solid var(--line)}
+#sheet{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.7);display:flex;align-items:flex-end}
+.sheet-in{background:#141414;border-top:1px solid #333;width:100%;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.sheet-in h2{margin:0 0 10px;font:800 15px var(--mono);color:var(--amber)}
+.sheet-in textarea{width:100%;min-height:200px;border:1px solid #333;border-radius:6px;padding:12px;background:var(--bg);color:var(--ink);font-family:inherit;font-size:14px;line-height:1.5}
+.opts{display:flex;gap:16px;margin:10px 0 4px;font-size:14px;flex-wrap:wrap}
+.off{color:var(--sub);font-size:12px;margin-bottom:8px}
+#chartWrap img{width:100%;border-radius:6px;border:1px solid #333}
 .sheet-btns{display:flex;gap:8px;margin-top:12px}
-.sheet-btns button{flex:1;padding:14px;border:0;border-radius:12px;font-weight:700}
-#toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:60}
+.sheet-btns button{flex:1;padding:13px;border:1px solid #333;border-radius:6px;font-weight:800}
+#toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:var(--amber);color:var(--amber-ink);padding:10px 16px;border-radius:6px;font-size:14px;z-index:60}
 </style>
 </head>
 <body>
@@ -110,7 +106,7 @@ details.ai[open] summary::after{content:" ▾"}
 <section id="app" class="hidden">
   <header>
     <div class="top">
-      <h1>📊 내 시황</h1>
+      <h1>MARKET.LOG</h1>
       <div class="meta">
         <span id="updated">-</span>
         <button class="icon-btn" id="refreshBtn" aria-label="새로고침">🔄</button>
@@ -134,10 +130,12 @@ details.ai[open] summary::after{content:" ▾"}
     <div class="opts">
       <label><input type="checkbox" id="optAi" checked> 🤖 AI 코멘트 포함</label>
       <label><input type="checkbox" id="optChart" checked> 📊 차트 이미지</label>
+      
     </div>
+    <div class="off" id="aiOff"></div>
     <div id="chartWrap"></div>
     <div class="sheet-btns">
-      <button id="sheetClose" style="background:var(--bg)">닫기</button>
+      <button id="sheetClose" style="background:var(--bg);color:var(--ink)">닫기</button>
       <button id="sheetSend" style="background:var(--kakao);color:#191919">보내기</button>
     </div>
   </div>
@@ -204,11 +202,6 @@ function fmtTime(iso){
 function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.add("hidden"), 2200); }
 function richText(text){
   let h = esc(text).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
-  const kw = keywords.filter(Boolean).map(k => k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"));
-  if(kw.length){
-    const re = new RegExp(`(${kw.join("|")})(?![^<]*>)`, "gi");
-    h = h.replace(re, "<mark>$1</mark>");
-  }
   return h;
 }
 
@@ -229,34 +222,68 @@ function renderChips(){
 function aiHtml(ai){
   if(!ai) return "";
   const li = arr => (arr||[]).map(x => `<p>${esc(x)}</p>`).join("");
-  return `<details class="ai"><summary>🤖 AI 코멘트</summary><div class="ai-body">
-    ${ai.key?`<p><b>${esc(ai.key)}</b></p>`:""}${li(ai.watch)}${li(ai.background)}
-    ${ai.implication?`<p>${esc(ai.implication)}</p>`:""}
-    <div class="note">${esc(ai.model||"AI")} 생성 · 투자 판단 참고용이며 사실 여부는 원문 확인 필요</div></div></details>`;
+  return `<details class="ai"><summary>AI› ${esc((ai.key||"").replace(/^🔑\s*/,""))} <span class="hint">▾</span></summary><div class="ai-body">
+    ${li(ai.watch)}${li(ai.background)}${ai.implication?`<p>${esc(ai.implication)}</p>`:""}
+    <div class="note">${esc(ai.model||"AI")} 생성 · 투자 판단 참고용, 원문 확인 필요</div></div></details>`;
+}
+function tagsFor(p){
+  const t = keywords.filter(k => k && p.text.toLowerCase().includes(k.toLowerCase())).slice(0,6);
+  return t.length ? `<div class="tags">${t.map(k=>"#"+esc(k.replace(/\s+/g,""))).join(" ")}</div>` : "";
+}
+const MEDIA = {"newspim.com":"뉴스핌","hankyung.com":"한국경제","mk.co.kr":"매일경제","yna.co.kr":"연합뉴스","edaily.co.kr":"이데일리","sedaily.com":"서울경제","mt.co.kr":"머니투데이","chosun.com":"조선일보","bloomberg.com":"Bloomberg","reuters.com":"Reuters","wsj.com":"WSJ","ft.com":"FT","cnbc.com":"CNBC","youtube.com":"YouTube","youtu.be":"YouTube"};
+function mediaName(u){
+  try{ const h = new URL(u).hostname.replace(/^www\.|^m\./,""); const k = Object.keys(MEDIA).find(d => h === d || h.endsWith("."+d)); return k ? MEDIA[k] : h; }catch(e){ return "링크"; }
+}
+const isLinkOnly = p => /^\s*https?:\/\/\S+\s*$/.test(p.text);
+function ticksHtml(p){
+  const mv = extractMoves(p.text).slice(0,6);
+  if(mv.length < 2) return "";
+  return `<div class="ticks">${mv.map(m => `<span class="l">${esc(m.label)}</span><span class="${m.v>=0?"u":"d"}">${m.v>=0?"▲":"▼"}${m.unit==="bp"?Math.abs(m.v).toFixed(1)+"bp":Math.abs(m.v).toFixed(2)+"%"}</span>`).join("")}</div>`;
 }
 function cardHtml(p){
   const isNew = p.id > (seenAtOpen[p.channel] || 0);
-  const long = p.text.split("\n").length > 6 || p.text.length > 260;
+  const linkOnly = isLinkOnly(p);
+  const long = !linkOnly && (p.text.split("\n").length > 5 || p.text.length > 220);
+  const t = new Date(p.date).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Seoul"});
   return `<article class="card" data-uid="${esc(p.uid)}">
-    <div class="card-h">${chEmoji(p.channel)} <b>${esc(chName(p.channel))}</b> · ${fmtTime(p.date)} ${isNew?'<span class="new">NEW</span>':""}</div>
+    <div class="card-h"><span>${esc(p.channel.toUpperCase())} · ${t}</span><span class="nm">${chEmoji(p.channel)} ${esc(chName(p.channel))}</span>${isNew?'<span class="new">NEW</span>':""}</div>
     ${p.forwarded?`<div class="fwd">↪︎ ${esc(p.forwarded)}에서 전달</div>`:""}
-    <div class="body ${long?"clamp":""}">${richText(p.text)}</div>
-    ${long?'<button class="more">더보기 ▾</button>':""}
+    ${ticksHtml(p)}
+    ${linkOnly
+      ? `<a class="linkcard" href="${esc(p.text.trim())}" target="_blank" rel="noopener">📰 ${esc(mediaName(p.text.trim()))} 기사 보기 <span>↗</span></a>`
+      : `<div class="body ${long?"clamp":""}">${richText(p.text)}</div>${long?'<button class="more">더보기 ▾</button>':""}`}
     ${p.photos&&p.photos.length?`<div class="photos">${p.photos.map(u=>`<img loading="lazy" src="${esc(u)}" alt="">`).join("")}</div>`:""}
     ${p.docs&&p.docs.length?`<div class="docs">${p.docs.map(d=>`<div>📎 ${esc(d)}</div>`).join("")}</div>`:""}
     ${aiHtml(p.ai)}
+    ${tagsFor(p)}
     <div class="actions">
       <button class="act kakao" data-share="${esc(p.uid)}">💬 카톡</button>
-      <a class="act link" href="${esc(p.url)}" target="_blank" rel="noopener">🔗 원문</a>
+      <a class="act" href="${esc(p.url)}" target="_blank" rel="noopener">🔗 원문</a>
     </div></article>`;
 }
 function reportHtml(p){
   const title = (p.docs && p.docs[0]) || p.text.split("\n").find(l => l.trim()) || "리포트";
-  const pdf = (p.links||[]).find(l => /\.pdf($|\?)/i.test(l)) || p.links[0] || p.url;
+  const pdf = (p.links||[]).find(l => /\.pdf($|\?)/i.test(l)) || (p.links||[])[0] || p.url;
   return `<a class="rep" href="${esc(pdf)}" target="_blank" rel="noopener">
     <div class="s">${chEmoji(p.channel)} ${esc(chName(p.channel))} · ${fmtTime(p.date)}</div>
     <div class="t">📄 ${esc(title.slice(0,80))}</div>
     <div class="s">${esc(p.text.replace(/\s+/g," ").slice(0,90))}</div></a>`;
+}
+function dayKey(iso){ return new Date(iso).toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"short",timeZone:"Asia/Seoul"}); }
+function grouped(list, fn){
+  let out = "", cur = null;
+  const counts = {};
+  list.forEach(p => { const k = dayKey(p.date); counts[k] = (counts[k]||0) + 1; });
+  const today = dayKey(new Date().toISOString());
+  for(const p of list){
+    const k = dayKey(p.date);
+    if(k !== cur){
+      cur = k;
+      out += `<div class="sec">── ${k === today ? "TODAY · " : ""}${esc(k)} · ${counts[k]}건</div>`;
+    }
+    out += fn(p);
+  }
+  return out;
 }
 function render(){
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
@@ -264,7 +291,7 @@ function render(){
   renderChips();
   const list = postsFor(state.tab, state.chip);
   $("#feed").innerHTML = list.length
-    ? (state.tab === "report" ? list.map(reportHtml).join("") : list.slice(0,150).map(cardHtml).join(""))
+    ? (state.tab === "report" ? grouped(list, reportHtml) : grouped(list.slice(0,150), cardHtml))
     : `<div class="empty">표시할 글이 없습니다.</div>`;
   $("#updated").textContent = "갱신 " + fmtTime(DATA.updated);
 }
@@ -286,9 +313,10 @@ function decorateLine(line){
   const pct = l.match(/([+\-−▲▼△▽])\s?\d+(\.\d+)?\s?(%|bp)/);
   let trend = "";
   if(pct) trend = /[+▲△]/.test(pct[1]) ? " 📈" : " 📉";
-  return `${em ? em[1] + " " : "▪️ "}${l}${trend}`;
+  return `${em ? em[1] + " " : "• "}${l}${trend}`;
 }
 function buildShareText(p, withAi){
+  if(isLinkOnly(p)) return `📊 [${chName(p.channel)}] ${fmtTime(p.date)}\n\n📰 ${mediaName(p.text.trim())} 기사\n${p.text.trim()}\n\n🔗 원문: ${p.url}`;
   const lines = p.text.split("\n").map(decorateLine).filter(Boolean);
   const head = `📊 [${chName(p.channel)}] ${fmtTime(p.date)}`;
   let body = lines.slice(0,14).join("\n");
@@ -305,34 +333,37 @@ function extractMoves(text){
   const out = [];
   for(const raw of text.split("\n")){
     const line = raw.replace(/^[-•·▪︎◦*\s]+/, "");
-    const m = line.match(/([+\-−▲▼△▽])\s?(\d+(?:\.\d+)?)\s?%/);
+    const m = line.match(/([+\-−▲▼△▽])\s?(\d+(?:\.\d+)?)\s?(%|bp)/i);
     if(!m) continue;
-    let label = line.slice(0, m.index).replace(/[\d,.]+\s*$/,"").replace(/[:：()\[\]]/g," ").trim();
-    label = label.split(/\s{2,}|,|\|/)[0].trim().slice(0,14);
-    if(!label || label.length < 2) continue;
+    let label = line.slice(0, m.index).replace(/[:：()\[\]]/g," ").trim();
+    let prev;
+    do{ prev = label; label = label.replace(/\s*[\d,.]+\s*(원|달러|bp|%|p|pt|엔)?$/i,"").trim(); }while(label !== prev);
+    label = label.split(/\s{2,}|\|/)[0].trim().slice(0,14);
+    if(!label) continue;
     const v = parseFloat(m[2]) * (/[\-−▼▽]/.test(m[1]) ? -1 : 1);
-    if(Math.abs(v) > 50) continue;
-    if(!out.some(o => o.label === label)) out.push({label, v});
+    const unit = m[3].toLowerCase() === "bp" ? "bp" : "%";
+    if(unit === "%" && Math.abs(v) > 50) continue;
+    if(!out.some(o => o.label === label)) out.push({label, v, unit});
     if(out.length >= 10) break;
   }
   return out;
 }
 function drawChart(p){
-  const moves = extractMoves(p.text);
+  const moves = extractMoves(p.text).filter(m => m.unit === "%");
   if(moves.length < 2) return null;
-  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark = true;
   const W = 1080, rowH = 78, top = 170, H = top + moves.length*rowH + 70;
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const g = c.getContext("2d");
-  const bg = dark ? "#151b2e" : "#ffffff", ink = dark ? "#e5e7eb" : "#111827", sub = dark ? "#94a3b8" : "#6b7280";
-  const up = "#dc2626", down = "#2563eb";
+  const bg = "#0a0a0a", ink = "#d9d9d9", sub = "#7a7a7a";
+  const up = "#ff5f56", down = "#4da3ff";
   g.fillStyle = bg; g.fillRect(0,0,W,H);
   const font = (w,s) => `${w} ${s}px -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif`;
-  g.fillStyle = ink; g.font = font(800,44); g.fillText(`📊 ${chName(p.channel)}`, 48, 80);
+  g.fillStyle = "#ffb000"; g.font = font(800,44); g.fillText(`${chName(p.channel)}`, 48, 80);
   g.fillStyle = sub; g.font = font(500,28); g.fillText(`${fmtTime(p.date)} · 등락률(%)`, 48, 126);
   const max = Math.max(...moves.map(m => Math.abs(m.v)), 0.1);
   const labelW = 330, mid = labelW + (W - labelW - 60)/2, half = (W - labelW - 60)/2 - 90;
-  g.strokeStyle = dark ? "#263049" : "#e5e7eb"; g.lineWidth = 2;
+  g.strokeStyle = "#333333"; g.lineWidth = 2;
   g.beginPath(); g.moveTo(mid, top-20); g.lineTo(mid, top + moves.length*rowH); g.stroke();
   moves.forEach((m,i) => {
     const y = top + i*rowH + rowH/2;
@@ -355,11 +386,14 @@ function openShare(uid){
   sharePost = DATA.posts.find(p => p.uid === uid);
   if(!sharePost) return;
   $("#optAi").checked = !!sharePost.ai; $("#optAi").disabled = !sharePost.ai;
+  $("#aiOff").textContent = sharePost.ai ? "" :
+    (isLinkOnly(sharePost) || sharePost.text.length < 80) ? "ⓘ 링크만 있거나 짧은 글이라 AI 코멘트가 없습니다"
+    : "ⓘ AI 코멘트가 아직 없습니다 (Gemini 키 등록 후 자동 생성)";
   $("#shareText").value = buildShareText(sharePost, $("#optAi").checked);
   chartBlob = null;
   const canvas = drawChart(sharePost);
   $("#optChart").disabled = !canvas; $("#optChart").checked = !!canvas;
-  $("#chartWrap").innerHTML = canvas ? "" : `<div class="s" style="color:var(--sub);font-size:13px">수치를 추출하지 못해 텍스트만 보냅니다.</div>`;
+  $("#chartWrap").innerHTML = canvas ? "" : `<div class="off">ⓘ 등락 수치가 없어 텍스트만 보냅니다</div>`;
   if(canvas){
     const img = new Image(); img.src = canvas.toDataURL("image/png"); $("#chartWrap").appendChild(img);
     canvas.toBlob(b => chartBlob = b, "image/png");
