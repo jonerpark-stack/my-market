@@ -518,7 +518,7 @@ const HOME_SECTIONS = [
     ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏커버 일수 · 스퀴즈 점수"],
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
-const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1, fg: 1, reddit: 1};
+const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1, heat: 1, flow: 1, rates: 1, fg: 1, reddit: 1, cal: 1};
 let watch = store.get("watch", []), wq = "", wOpen = null, SCR = null, scrLoading = false, scrNear = false, SCA = null, scaLoading = false;
 async function loadSCA(){ if(scaLoading) return; scaLoading = true; try{ const r = await fetch("scr_all.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ SCA = await r.json(); if(state.tab === "home") render(); } }catch(e){} }
 function chartHtml(c, y){
@@ -568,6 +568,8 @@ function watchHtml(){
       ${open ? `<div style="padding:0 0 10px 8px;border-left:2px solid var(--amber);margin-bottom:8px">${chartHtml(y[0], y)}
         ${ds.slice(0, 6).map(x => `<a data-dart="${x.rno}" href="#" style="display:block;font-size:12.5px;color:var(--ink);text-decoration:none;padding:3px 0">📄 ${x.dt.slice(4,6)}/${x.dt.slice(6)} ${esc(x.nm)}${dartSummary(x) ? ` <span style="color:var(--sub)">· ${dartSummary(x)}</span>` : ""}</a>`).join("") || `<div class="hdesc">최근 30일 주요 공시 없음</div>`}
         ${rs.slice(0, 5).map(x => `<div data-rp="${x.id}" style="font-size:12.5px;padding:3px 0;cursor:pointer">📑 ${esc(x.broker || "")} · ${esc(x.title || "")}</div>`).join("")}
+        <div style="margin:6px 0"><button class="act" data-tv="${y[0]}" style="padding:6px 10px">📊 ${tvOpen === y[0] ? "차트 닫기" : "트레이딩뷰 차트"}</button></div>
+        ${tvOpen === y[0] ? tvFrame(y[0]) : ""}
         <a href="https://m.stock.naver.com/domestic/stock/${y[0]}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--sub)">네이버 종목 화면 ›</a></div>` : ""}</div>`;
   }).join("");
   const q = wq.trim().toLowerCase(), sug = q ? (KR.stocks || []).filter(y => y[1].toLowerCase().includes(q) || y[0].includes(q)).slice(0, 6) : [];
@@ -576,6 +578,17 @@ function watchHtml(){
     ${rows || `<div class="hdesc" style="margin:8px 0">관심 종목을 추가하면 등락률 · 최근 공시 · 관련 리포트를 한 번에 봅니다.</div>`}
     <div class="hdesc" style="margin:8px 0">이 기기에 저장 · 스크리너 통과 종목은 자동 추가·강조 (✕로 빼면 다시 자동 추가 안 함)</div>${scrHtml()}`;
 }
+let tvOpen = null, tvIv = store.get("tvIv", "W");
+function tvFrame(code){
+  const ivs = [["D", "일봉"], ["W", "주봉"], ["M", "월봉"]];
+  return `<div style="display:flex;gap:4px;margin:4px 0">${ivs.map(([v, t]) => `<button class="act" data-tviv="${v}" style="padding:4px 8px;font-size:12px;${tvIv === v ? "color:#111;background:var(--amber);border-color:var(--amber)" : ""}">${t}</button>`).join("")}</div>
+    <iframe src="https://s.tradingview.com/widgetembed/?symbol=KRX%3A${code}&interval=${tvIv}&theme=dark&style=1&locale=kr&hidesidetoolbar=1&studies=RSI%40tv-basicstudies%1FVolume%40tv-basicstudies&timezone=Asia%2FSeoul" style="width:100%;height:420px;border:0;border-radius:6px" loading="lazy" allowfullscreen></iframe>
+    <div class="hdesc" style="margin:2px 0 6px">트레이딩뷰 공개 차트(RSI·거래량) · 계정 레이아웃·유료 지표는 연동되지 않음</div>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-tv]"); if(t){ tvOpen = tvOpen === t.dataset.tv ? null : t.dataset.tv; render(); return; }
+  const v = e.target.closest("[data-tviv]"); if(v){ tvIv = v.dataset.tviv; store.set("tvIv", tvIv); render(); }
+});
 function wsugHtml(sug){ return sug.map(y => `<div data-wadd="${y[0]}" style="display:flex;gap:8px;padding:8px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13.5px"><span style="flex:1">${esc(y[1])} <span style="color:var(--sub);font-size:11.5px">${y[0]} · ${y[4] === "K" ? "KOSPI" : "KOSDAQ"}</span></span><span style="color:var(--amber)">＋ 추가</span></div>`).join(""); }
 document.addEventListener("input", e => { if(e.target.id === "wq"){ wq = e.target.value; const q = wq.trim().toLowerCase();
   $("#wsug").innerHTML = wsugHtml(q && KR ? (KR.stocks || []).filter(y => y[1].toLowerCase().includes(q) || y[0].includes(q)).slice(0, 6) : []); } });
@@ -1139,7 +1152,66 @@ function redditHtml(){
       <td style="text-align:right;color:var(--sub)">${r.m24.toLocaleString()}</td><td style="text-align:right">${sq[r.t] != null ? `<span data-sqt="${esc(r.t)}" style="color:${sq[r.t] >= 70 ? "var(--amber)" : "var(--sub)"};cursor:pointer">${sq[r.t].toFixed(0)}</span>` : "-"}</td></tr>`; }).join("")}</table>
     <div class="hdesc" style="margin:10px 0">출처 ApeWisdom (r/wallstreetbets 등) · 언급 ±50% 이상 변화만 표시 · 스퀴즈 점수는 SHORT SQUEEZE US 기준</div>`;
 }
+/* ---------- 한미 이벤트 캘린더 (고정 일정) ----------
+   출처: 연준 2026.11.12 수정 일정, 한국은행 2026.10.29 금통위 의결 일정, 한국거래소·NYSE 휴장일 공지 */
+const CAL_FIX = [
+  ["2026-12-09", "us", "FOMC 금리 결정", "12/8~9 회의 · 한국시간 12/10(목) 04:00 발표 · 점도표"],
+  ["2026-12-25", "kr", "휴장 (성탄절)", ""], ["2026-12-25", "us", "휴장 (크리스마스)", ""], ["2026-12-24", "us", "조기 폐장 (뉴욕 13시)", "크리스마스 이브"],
+  ["2026-12-31", "kr", "휴장 (연말)", "12/30(수) 폐장"],
+  ["2027-01-01", "kr", "휴장 (신정)", ""], ["2027-01-01", "us", "휴장 (새해)", ""],
+  ["2027-01-14", "kr", "금통위 기준금리 결정", ""], ["2027-01-18", "us", "휴장 (마틴 루터 킹 데이)", ""],
+  ["2027-01-27", "us", "FOMC 금리 결정", "1/26~27 회의"], ["2027-02-08", "kr", "휴장 (설날)", ""], ["2027-02-09", "kr", "휴장 (설날 대체)", ""],
+  ["2027-02-15", "us", "휴장 (대통령의 날)", ""], ["2027-02-25", "kr", "금통위 기준금리 결정", ""], ["2027-03-01", "kr", "휴장 (삼일절)", ""],
+  ["2027-03-17", "us", "FOMC 금리 결정", "3/16~17 회의 · 점도표"], ["2027-03-26", "us", "휴장 (성금요일)", ""],
+  ["2027-04-09", "kr", "금통위 기준금리 결정", ""], ["2027-04-28", "us", "FOMC 금리 결정", "4/27~28 회의"],
+  ["2027-05-03", "kr", "휴장 (노동절 대체)", ""], ["2027-05-05", "kr", "휴장 (어린이날)", ""], ["2027-05-13", "kr", "휴장 (부처님오신날)", ""],
+  ["2027-05-27", "kr", "금통위 기준금리 결정", ""], ["2027-05-31", "us", "휴장 (메모리얼 데이)", ""],
+  ["2027-06-09", "us", "FOMC 금리 결정", "6/8~9 회의 · 점도표"], ["2027-06-18", "us", "휴장 (준틴스 대체)", ""],
+  ["2027-07-05", "us", "휴장 (독립기념일 대체)", ""], ["2027-07-15", "kr", "금통위 기준금리 결정", ""], ["2027-07-19", "kr", "휴장 (제헌절 대체)", ""],
+  ["2027-07-28", "us", "FOMC 금리 결정", "7/27~28 회의"], ["2027-08-16", "kr", "휴장 (광복절 대체)", ""], ["2027-08-26", "kr", "금통위 기준금리 결정", ""],
+  ["2027-09-06", "us", "휴장 (노동절)", ""], ["2027-09-14", "kr", "휴장 (추석)", "9/14~16"], ["2027-09-15", "us", "FOMC 금리 결정", "9/14~15 회의 · 점도표"],
+  ["2027-10-04", "kr", "휴장 (개천절 대체)", ""], ["2027-10-11", "kr", "휴장 (한글날 대체)", ""], ["2027-10-15", "kr", "금통위 기준금리 결정", ""],
+  ["2027-10-27", "us", "FOMC 전략 회의", "10/26~27 · 금리 결정 없음"], ["2027-11-17", "us", "FOMC 금리 결정", "11/16~17 회의 · 연내 마지막"],
+  ["2027-11-25", "kr", "금통위 기준금리 결정", ""], ["2027-11-25", "us", "휴장 (추수감사절)", ""], ["2027-12-24", "us", "휴장 (크리스마스 대체)", ""],
+  ["2027-12-27", "kr", "휴장 (성탄절 대체)", ""], ["2027-12-31", "kr", "휴장 (연말)", ""]];
+function calEvents(){
+  const ev = CAL_FIX.map(x => ({d: x[0], c: x[1], t: x[2], s: x[3]}));
+  const hol = new Set(CAL_FIX.filter(x => x[2].startsWith("휴장")).map(x => x[1] + x[0]));
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  for(let y = 2026; y <= 2027; y++) for(let m = 0; m < 12; m++){
+    if(y === 2026 && m < 11) continue;
+    let d = new Date(y, m, 1), th = 0; while(true){ if(d.getDay() === 4 && ++th === 2) break; d.setDate(d.getDate() + 1); }
+    while(hol.has("kr" + iso(d)) || d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+    const q = [2, 5, 8, 11].includes(m);
+    ev.push({d: iso(d), c: "kr", t: q ? "선물·옵션 동시만기 (네 마녀의 날)" : "옵션 만기", s: "둘째 목요일"});
+    let f = new Date(y, m, 1), fr = 0; while(true){ if(f.getDay() === 5 && ++fr === 3) break; f.setDate(f.getDate() + 1); }
+    while(hol.has("us" + iso(f))) f.setDate(f.getDate() - 1);
+    ev.push({d: iso(f), c: "us", t: q ? "쿼드러플 위칭 (선물·옵션 동시만기)" : "월간 옵션 만기", s: "셋째 금요일"});
+  }
+  return ev.sort((a, b) => a.d.localeCompare(b.d));
+}
+let calF = "all";
+document.addEventListener("click", e => { const b = e.target.closest("[data-calf]"); if(b){ calF = b.dataset.calf; render(); } });
+function calHtml(){
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const iso0 = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const ev = calEvents().filter(x => x.d >= iso0 && (calF === "all" || (calF === "rate" ? /금리|금통위|FOMC/.test(x.t) : calF === "hol" ? x.t.startsWith("휴장") || x.t.startsWith("조기") : calF === "exp" ? /만기|위칭/.test(x.t) : true)));
+  const btn = (v, t) => `<button class="act" data-calf="${v}" style="padding:6px 10px;${calF === v ? "color:#111;background:var(--amber);border-color:var(--amber)" : ""}">${t}</button>`;
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:12px 0">${btn("all", "전체")}${btn("rate", "금리 결정")}${btn("hol", "휴장")}${btn("exp", "만기")}</div>`, lm = "";
+  const wd = "일월화수목금토";
+  for(const x of ev){
+    const m = x.d.slice(0, 7); if(m !== lm){ h += `<div class="sec" style="margin-top:12px">── ${+m.slice(0, 4)}년 ${+m.slice(5)}월</div>`; lm = m; }
+    const dd = new Date(x.d + "T00:00:00"), dn = Math.round((dd - today) / 864e5);
+    const col = /금리|FOMC/.test(x.t) ? "var(--amber)" : x.t.startsWith("휴장") ? "#60a5fa" : "var(--ink)";
+    h += `<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">
+      <div style="width:46px;text-align:center"><div style="font-weight:800;font-size:15px">${+x.d.slice(8)}</div><div style="font-size:11px;color:var(--sub)">${wd[dd.getDay()]}</div></div>
+      <div style="flex:1"><div style="font-size:14px;color:${col}">${x.c === "kr" ? "🇰🇷" : "🇺🇸"} ${esc(x.t)}</div>${x.s ? `<div class="hdesc">${esc(x.s)}</div>` : ""}</div>
+      <div style="font-size:12px;color:${dn <= 7 ? "var(--amber)" : "var(--sub)"}">${dn === 0 ? "오늘" : "D-" + dn}</div></div>`;
+  }
+  return h + `<div class="hdesc" style="margin:12px 0">출처: 연준 2027 수정 일정(2026.11.12), 한국은행 2027 금통위 일정(2026.10.29 의결), 한국거래소·미국 거래소 휴장일 · 옵션 만기일은 규칙으로 계산(휴장 시 전 영업일) · 미국 기업 실적 발표·경제지표(CPI·고용)는 아직 미포함, 국내 잠정실적은 '잠정실적' 메뉴</div>`;
+}
 function pageHtml(){
+  if(pgId === "cal"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + calHtml(); }
   if(pgId === "reddit"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + redditHtml(); }
   if(pgId === "fg"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + fgHtml(); }
   if(pgId === "rates"){ const w = WHEN[pgId] || []; return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + ratesHtml(); }
@@ -1461,7 +1533,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795786195";
+const APP_VERSION = "1795787314";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
