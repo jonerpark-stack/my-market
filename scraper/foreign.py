@@ -1,5 +1,5 @@
 """해외 하우스뷰·공개 리포트 수집 + Gemini 한국어 요약 → docs/foreign.json"""
-import base64, json, os, re, sys, time, urllib.request
+import base64, html as html_lib, json, os, re, sys, time, urllib.error, urllib.request
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -57,14 +57,15 @@ def src_fed():
     xml = _get("https://www.federalreserve.gov/feeds/press_monetary.xml")[0].decode("utf-8-sig", "replace")
     out = []
     for it in re.findall(r"<item>(.*?)</item>", xml, re.S)[:12]:
-        t = re.search(r"<title>(.*?)</title>", it, re.S).group(1).strip()
-        link = re.search(r"<link>(.*?)</link>", it, re.S).group(1).strip()
+        cd = lambda v: html_lib.unescape(re.sub(r"<!\[CDATA\[|\]\]>", "", v)).strip()
+        t = cd(re.search(r"<title>(.*?)</title>", it, re.S).group(1))
+        link = cd(re.search(r"<link>(.*?)</link>", it, re.S).group(1))
         pd = re.search(r"<pubDate>(.*?)</pubDate>", it, re.S)
         d = parsedate_to_datetime(pd.group(1)).astimezone(KST).date().isoformat() if pd else ""
-        if not re.search(r"FOMC|Federal Open Market|minutes|monetary policy", t, re.I):
+        if not re.search(r"FOMC statement|Minutes of the Federal Open Market|economic projections", t, re.I):
             continue
         out.append({"id": "fed-" + re.sub(r"\W+", "", link)[-40:], "house": "Federal Reserve", "series": "FOMC",
-                    "title": re.sub(r"<!\[CDATA\[|\]\]>", "", t), "date": d, "url": link, "pdf": False})
+                    "title": t, "date": d, "url": link, "pdf": False})
     return out
 
 
@@ -79,6 +80,12 @@ def src_generic(house, series, base, pattern):
         d = f"{dm.group(1)}-{dm.group(2)}-{dm.group(3) or '01'}" if dm else ""
         out.append({"id": house[:3].lower() + "-" + re.sub(r"\W+", "", full)[-50:], "house": house, "series": series,
                     "title": name[:90].capitalize(), "date": d, "url": _abs(base, full), "pdf": True})
+    for x in out:
+        if house == "Vanguard":
+            y = re.search(r"(20\d\d)", x["url"])
+            x["title"] = f"Vanguard Economic and Market Outlook {y.group(1) if y else ''}".strip()
+            x["date"] = x["date"] or datetime.now(KST).date().isoformat()
+            x["id"] = "van-" + (y.group(1) if y else "x")
     return out[-6:]
 
 
@@ -129,7 +136,7 @@ def summarize(item):
             return {"text": j["candidates"][0]["content"]["parts"][0]["text"].strip(), "model": model}
         except urllib.error.HTTPError as e:
             if e.code != 404:
-                print(f"[FOREIGN] 요약 실패 {item['id']}: {e}", file=sys.stderr)
+                print(f"[FOREIGN] 요약 실패 {item['id']} ({model}): {e} {e.read()[:300]!r}", file=sys.stderr)
                 return None
     return None
 
