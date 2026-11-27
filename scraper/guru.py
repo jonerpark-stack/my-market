@@ -1,5 +1,5 @@
-"""GURU 포트폴리오: SEC EDGAR 13F-HR 최근 2개 분기 비교 → docs/guru.json
-SEC 공정 접근 규칙에 따라 User-Agent에 이름과 연락처를 밝히고, 초당 10회 미만으로 요청한다.
+"""GURU 포트폴리오: 13F-HR 최근 2개 분기 비교 → docs/guru.json
+SEC가 클라우드 서버 접속을 막아 13f.info(SEC 13F 정리 사이트, robots.txt 허용 경로)에서 받는다. 12시간에 한 번만 요청.
 """
 import os, json, time, re, datetime as dt, urllib.request
 import xml.etree.ElementTree as ET
@@ -22,23 +22,30 @@ def get(url, raw=False):
         b = r.read()
     return b if raw else json.loads(b.decode("utf-8"))
 
-def holdings(cik, acc):
-    base = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc.replace('-', '')}"
-    idx = get(base + "/index.json")
-    xmls = [f["name"] for f in idx["directory"]["item"] if f["name"].lower().endswith(".xml") and "primary_doc" not in f["name"].lower()]
-    for nm in xmls:
-        root = ET.fromstring(get(f"{base}/{nm}", raw=True))
-        rows = [e for e in root.iter() if e.tag.split("}")[-1] == "infoTable"]
-        if not rows: continue
-        agg = {}
-        for e in rows:
-            g = lambda t: next((x.text for x in e.iter() if x.tag.split("}")[-1] == t), None)
-            if (g("putCall") or "").strip(): continue   # 옵션 제외
-            cu = g("cusip"); v = float(g("value") or 0); sh = float(g("sshPrnamt") or 0)
-            a = agg.setdefault(cu, {"n": (g("nameOfIssuer") or "").strip().title(), "v": 0, "sh": 0, "cls": (g("titleOfClass") or "").strip()})
-            a["v"] += v; a["sh"] += sh
-        return agg
-    return {}
+def page(url):
+    time.sleep(0.5)
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.geturl(), r.read().decode("utf-8", "ignore")
+
+def filings(cik):
+    """13f.info 운용사 페이지 → [(분기 id, 분기 이름, 공시일)] 최신순"""
+    url, h = page(f"https://13f.info/manager/{cik.zfill(10)}")
+    out, seen = [], set()
+    for fid, q in re.findall(r'href="/13f/(\d+)-[a-z0-9-]*-(q\d-\d{4})"', h):
+        if q in seen: continue
+        seen.add(q); out.append((fid, q.upper().replace("-", " ")))
+    return out
+
+def holdings(fid):
+    _, t = page(f"https://13f.info/data/13f/{fid}")
+    agg = {}
+    for r in json.loads(t)["data"]:
+        tk, nm, cls, cu, v, pct, sh = r[:7]
+        if len(r) > 7 and r[7]: continue   # 옵션(Put/Call) 제외
+        a = agg.setdefault(cu, {"n": (nm or "").title(), "t": tk or "", "v": 0, "sh": 0})
+        a["v"] += (v or 0) * 1000; a["sh"] += sh or 0
+    return agg
 
 def run():
     old = {}
@@ -49,24 +56,18 @@ def run():
     out = []
     for cik, name, who in FUNDS:
         try:
-            sub = get(f"https://data.sec.gov/submissions/CIK{cik.zfill(10)}.json")
-            r = sub["filings"]["recent"]
-            fl = [(r["accessionNumber"][i], r["reportDate"][i], r["filingDate"][i]) for i, f in enumerate(r["form"]) if f == "13F-HR"]
-            seen, uniq = set(), []
-            for a, rep, fd in fl:   # 같은 분기 중복(정정 전 원본) 제거
-                if rep in seen: continue
-                seen.add(rep); uniq.append((a, rep, fd))
+            uniq = filings(cik)
             if not uniq: print("[GURU] 13F 없음", name); continue
-            cur = holdings(cik, uniq[0][0]); prev = holdings(cik, uniq[1][0]) if len(uniq) > 1 else {}
+            cur = holdings(uniq[0][0]); prev = holdings(uniq[1][0]) if len(uniq) > 1 else {}
             tot = sum(x["v"] for x in cur.values()) or 1
             rows = []
             for cu, x in cur.items():
                 p = prev.get(cu); chg = None if not p or not p["sh"] else x["sh"] / p["sh"] - 1
-                rows.append({"n": x["n"], "cu": cu, "w": round(x["v"] / tot * 100, 2), "v": x["v"], "sh": x["sh"],
+                rows.append({"n": x["n"], "t": x["t"], "cu": cu, "w": round(x["v"] / tot * 100, 2), "v": x["v"], "sh": x["sh"],
                              "st": "new" if not p else "up" if chg and chg > 0.02 else "down" if chg is not None and chg < -0.02 else "same", "chg": round(chg * 100, 1) if chg is not None else None})
-            sold = [{"n": p["n"], "cu": cu, "pw": round(p["v"] / (sum(y["v"] for y in prev.values()) or 1) * 100, 2)} for cu, p in prev.items() if cu not in cur]
+            sold = [{"n": p["n"], "t": p["t"], "cu": cu, "pw": round(p["v"] / (sum(y["v"] for y in prev.values()) or 1) * 100, 2)} for cu, p in prev.items() if cu not in cur]
             rows.sort(key=lambda x: -x["v"])
-            out.append({"cik": cik, "fund": name, "who": who, "q": uniq[0][1], "filed": uniq[0][2], "pq": uniq[1][1] if len(uniq) > 1 else None,
+            out.append({"cik": cik, "fund": name, "who": who, "q": uniq[0][1], "filed": "", "pq": uniq[1][1] if len(uniq) > 1 else None,
                         "total": tot, "n": len(rows), "rows": rows[:60], "sold": sorted(sold, key=lambda x: -x["pw"])[:30]})
             print(f"[GURU] {name} {uniq[0][1]} 종목 {len(rows)} · 신규 {sum(1 for x in rows if x['st']=='new')} · 전량매도 {len(sold)}")
         except Exception as e:
