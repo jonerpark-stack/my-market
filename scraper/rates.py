@@ -26,7 +26,11 @@ def run():
     for cat, code, name, unit in ITEMS:
         q = urllib.parse.quote(code)
         d = (get(f"https://m.stock.naver.com/front-api/marketIndex/productDetail?category={cat}&reutersCode={q}") or {}).get("result") or {}
-        h = (get(f"https://m.stock.naver.com/front-api/marketIndex/prices?category={cat}&reutersCode={q}&page=1&pageSize=70") or {}).get("result") or []
+        h = []
+        for pg in (1, 2):   # pageSize는 최대 60 → 2쪽으로 약 120영업일
+            part = (get(f"https://m.stock.naver.com/front-api/marketIndex/prices?category={cat}&reutersCode={q}&page={pg}&pageSize=60") or {}).get("result") or []
+            h += part
+            if len(part) < 60: break
         hist = [[x["localTradedAt"][:10], f(x.get("closePrice"))] for x in h if x.get("closePrice")][::-1]
         out["items"].append({"code": code, "name": name, "unit": unit, "cat": cat, "price": f(d.get("closePrice")) or (hist[-1][1] if hist else None),
                              "chg": f(d.get("fluctuations")), "pct": f(d.get("fluctuationsRatio")), "at": d.get("localTradedAt", ""), "hist": hist})

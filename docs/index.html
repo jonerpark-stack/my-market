@@ -848,7 +848,7 @@ const GRP = {"반도체":["반도체와반도체장비"],"IT·전자부품":["�
   "운송·물류":["항공사","해운사","항공화물운송과물류","도로와철도운송","운송인프라"],"유통·음식료":["식품","음료","담배","식품과기본식료품소매","백화점과일반상점","인터넷과카탈로그소매","전문소매"],
   "화장품·소비재":["화장품","섬유,의류,신발,호화품","가정용품","가정용기기와용품","가구","레저용장비와제품","호텔,레스토랑,레저","교육서비스","다각화된소비자서비스"]};
 const SEC2GRP = {}; for(const [g, xs] of Object.entries(GRP)) xs.forEach(x => SEC2GRP[x] = g);
-let hmMkt = store.get("hmMkt", "K"), hmEq = false, hmGreen = store.get("hmGreen", false), hmQ = "", hmPick = null;
+let hmMkt = store.get("hmMkt", "K"), hmEq = false, hmGreen = store.get("hmGreen2", true), hmQ = "", hmPick = null;
 function squarify(items, x, y, w, h){   // items: [{v,...}] 큰 순서 → 각 item에 x,y,w,h 부여
   const out = [], tot = items.reduce((a, b) => a + b.v, 0); if(!tot || w <= 0 || h <= 0) return out;
   const sc = w * h / tot, rest = items.map(it => Object.assign({}, it, {a: it.v * sc}));
@@ -928,7 +928,7 @@ document.addEventListener("click", e => {
   const c = e.target.closest("[data-hm]"); if(c){ hmPick = hmPick === c.dataset.hm ? null : c.dataset.hm; $("#hmpick").innerHTML = hmPickHtml(); drawHmap(); return; }
   const k = e.target.closest("[data-hmk]"); if(k){ hmMkt = k.dataset.hmk; store.set("hmMkt", hmMkt); heatSort = "mv"; hmPick = null; render(); return; }
   if(e.target.closest("[data-hmeq]")){ hmEq = !hmEq; render(); return; }
-  if(e.target.closest("[data-hmg]")){ hmGreen = !hmGreen; store.set("hmGreen", hmGreen); render(); return; }
+  if(e.target.closest("[data-hmg]")){ hmGreen = !hmGreen; store.set("hmGreen2", hmGreen); render(); return; }
 });
 document.addEventListener("input", e => { if(e.target.id === "hmq"){ hmQ = e.target.value; hmPick = null; $("#hmpick").innerHTML = hmPickHtml(); drawHmap(); } });
 window.addEventListener("resize", () => drawHmap());
@@ -1324,7 +1324,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795779598";
+const APP_VERSION = "1795780187";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
