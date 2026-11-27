@@ -35,7 +35,9 @@ def filings(cik):
     for fid, q in re.findall(r'href="/13f/(\d+)-[a-z0-9-]*-(q\d-\d{4})"', h):
         if q in seen: continue
         seen.add(q); out.append((fid, q.upper().replace("-", " ")))
-    return out
+    # 페이지 표시 순서가 최신순이 아닐 수 있어 분기로 정렬
+    key = lambda x: (int(x[1][-4:]), int(x[1][1]))
+    return sorted(out, key=key, reverse=True)
 
 def holdings(fid):
     _, t = page(f"https://13f.info/data/13f/{fid}")
@@ -67,7 +69,8 @@ def run():
                              "st": "new" if not p else "up" if chg and chg > 0.02 else "down" if chg is not None and chg < -0.02 else "same", "chg": round(chg * 100, 1) if chg is not None else None})
             sold = [{"n": p["n"], "t": p["t"], "cu": cu, "pw": round(p["v"] / (sum(y["v"] for y in prev.values()) or 1) * 100, 2)} for cu, p in prev.items() if cu not in cur]
             rows.sort(key=lambda x: -x["v"])
-            out.append({"cik": cik, "fund": name, "who": who, "q": uniq[0][1], "filed": "", "pq": uniq[1][1] if len(uniq) > 1 else None,
+            stale = int(uniq[0][1][-4:]) * 4 + int(uniq[0][1][1]) < (dt.datetime.now(KST).year * 4 + (dt.datetime.now(KST).month - 1) // 3 + 1) - 2
+            out.append({"stale": stale, "cik": cik, "fund": name, "who": who, "q": uniq[0][1], "filed": "", "pq": uniq[1][1] if len(uniq) > 1 else None,
                         "total": tot, "n": len(rows), "rows": rows[:60], "sold": sorted(sold, key=lambda x: -x["pw"])[:30]})
             print(f"[GURU] {name} {uniq[0][1]} 종목 {len(rows)} · 신규 {sum(1 for x in rows if x['st']=='new')} · 전량매도 {len(sold)}")
         except Exception as e:

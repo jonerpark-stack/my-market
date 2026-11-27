@@ -1267,7 +1267,7 @@ function guruHtml(){
     ${common.map(([n, w]) => `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px"><b style="flex:1">${esc(n)}</b><span style="color:var(--sub);font-size:12px;text-align:right">${esc(w.join(", "))}</span></div>`).join("")}` : ""}
     <div style="display:flex;flex-wrap:wrap;gap:5px;margin:14px 0 8px">${fs.map(x => `<button class="act" data-gu="${x.cik}" style="padding:5px 9px;font-size:12.5px;${x.cik === f.cik ? "color:#111;background:var(--amber);border-color:var(--amber)" : ""}">${esc(x.who)}</button>`).join("")}</div>
     <div style="font-size:15px;font-weight:800">${esc(f.who)} <span style="color:var(--sub);font-weight:400;font-size:12.5px">${esc(f.fund)}</span></div>
-    <div class="hdesc">${esc(f.q)} 기준 · 총 ${big(f.total)} · ${f.n}종목 · 직전 ${esc(f.pq || "-")} 대비</div>
+    <div class="hdesc">${esc(f.q)} 기준${f.stale ? ` <span style="color:#ef5350">(최근 공시 없음 · 운용 중단 또는 공시 대상 아님)</span>` : ""} · 총 ${big(f.total)} · ${f.n}종목 · 직전 ${esc(f.pq || "-")} 대비</div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px"><tr style="color:var(--sub);font-size:11.5px"><td>종목</td><td style="text-align:right">비중</td><td style="text-align:right">평가액</td><td style="text-align:right">변화</td></tr>
     ${f.rows.slice(0, 30).map(r => `<tr style="border-top:1px solid var(--line)"><td style="padding:6px 0;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.t ? `<b>${esc(r.t)}</b> ` : ""}<span style="color:var(--sub);font-size:12px">${esc(r.n)}</span></td><td style="text-align:right">${r.w.toFixed(1)}%</td><td style="text-align:right;color:var(--sub)">${big(r.v)}</td><td style="text-align:right">${badge(r)}</td></tr>`).join("")}</table>
     ${f.sold.length ? `<div class="sec">── 전량 매도 ${f.sold.length}종목</div>${f.sold.map(x => `<div style="display:flex;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px"><span style="flex:1">${esc(x.n)}</span><span style="color:var(--sub)">직전 비중 ${x.pw.toFixed(1)}%</span></div>`).join("")}` : ""}
@@ -1597,7 +1597,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795795945";
+const APP_VERSION = "1795796315";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
