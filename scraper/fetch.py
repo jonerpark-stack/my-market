@@ -195,6 +195,9 @@ REVIEW_PROMPT = """아래는 시황 원문과, 그것을 바탕으로 쓴 짧은
 1. 논리적 비약 제거: "~에도", "~이므로", "따라서", "그래서"로 두 사실을 연결한 줄은 그 이유가 원문에 있는지 확인한다.
    - 원문에 이유가 있으면 그 이유를 같은 줄에 짧게 넣어 연결을 완성한다 (예: "GDP 강세에도 인상 확률 변화 미미함, 물가 둔화로 인상 명분이 약하기 때문" 처럼 원문 근거로)
    - 원문에 이유가 없으면 연결어를 빼고 두 사실을 각각 따로 적거나 그 줄을 삭제한다
+   - 특히 "A에도 B"(예상과 반대 결과)는 '왜 예상과 다르게 됐는지'가 원문에 명시된 경우에만 허용한다.
+     원문이 결과만 전하고 이유를 말하지 않으면 "에도"를 쓰지 말고 "A 확인됨" / "B" 처럼 사실을 나눠 적는다
+     (나쁜 예: "GDP 강세에도 인상 확률 변화 미미함" → 이유 없음 → 좋은 예: "3분기 GDP 강세 확인됨" + "다만 연준 인상 확률은 거의 변하지 않음, 시장은 성장보다 물가 둔화에 무게를 둠"(원문에 근거가 있을 때만))
 2. 앞뒤 줄이 실제로 이어지지 않는데 "따라서"로 시작하면 연결어를 지운다
 3. 원문에 없는 수치·사실은 삭제한다
 4. 형식 유지: 개조식 명사형 종결(~임/~음/~됨/~함), 줄마다 한 논점, 마침표 없음, 이모지 없음, 3~5줄, 마지막 줄은 필요하면 "한줄 요약: ..."
@@ -285,7 +288,7 @@ def ai_comment(post: dict, channel_name: str) -> dict | None:
     if parsed:
         parsed["take"] = "\n".join(l.rstrip().rstrip(".").rstrip() for l in parsed.get("take", "").splitlines() if l.strip()
                                    and not l.strip().startswith("시장의 판단"))
-        parsed["tv"] = 3
+        parsed["tv"] = 4
     if parsed and ("핵심 한 줄" in parsed["key"] or len(parsed["key"]) < 12):
         return None
     if parsed:
@@ -337,7 +340,7 @@ def main():
     for p in posts:
         if budget <= 0:
             break
-        if (p.get("ai") and p["ai"].get("take") and p["ai"].get("tv") == 3) or len(p["text"]) < 80 or datetime.fromisoformat(p["date"]) < ai_window:
+        if (p.get("ai") and p["ai"].get("take") and p["ai"].get("tv") == 4) or len(p["text"]) < 80 or datetime.fromisoformat(p["date"]) < ai_window:
             continue
         p["ai"] = ai_comment(p, names.get(p["channel"], p["channel"]))
         budget -= 1
