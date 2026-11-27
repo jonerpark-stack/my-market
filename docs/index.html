@@ -932,6 +932,38 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("input", e => { if(e.target.id === "hmq"){ hmQ = e.target.value; hmPick = null; $("#hmpick").innerHTML = hmPickHtml(); drawHmap(); } });
 window.addEventListener("resize", () => drawHmap());
+function vbars(rows){
+  const mx = Math.max(1, ...rows.map(r => Math.abs(r[1] || 0))), H = 70;
+  return `<div style="display:grid;grid-template-columns:repeat(${rows.length},1fr);gap:8px;text-align:center;font-size:12.5px;margin-top:6px">${rows.map(([k, x]) => {
+    const h = Math.max(2, Math.abs(x || 0) / mx * H), up = (x || 0) >= 0;
+    return `<div><div style="color:${fcol(x)};font-weight:700;height:18px">${up ? eok(x) : ""}</div>
+      <div style="height:${H}px;display:flex;align-items:flex-end;justify-content:center">${up ? `<div style="width:60%;height:${h}px;background:#e53935;border-radius:4px 4px 0 0"></div>` : ""}</div>
+      <div style="border-top:1px solid #555;height:${H}px;display:flex;align-items:flex-start;justify-content:center">${!up ? `<div style="width:60%;height:${h}px;background:#1e88e5;border-radius:0 0 4px 4px"></div>` : ""}</div>
+      <div style="color:${fcol(x)};font-weight:700;height:18px">${!up ? eok(x) : ""}</div><div style="color:var(--sub);margin-top:2px">${k}</div></div>`; }).join("")}</div>`;
+}
+function spark(hist, w = 120, h = 34){
+  const v = hist.map(x => x[1]).filter(x => x != null); if(v.length < 2) return "";
+  const lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1;
+  const pts = v.map((y, i) => `${(i / (v.length - 1) * w).toFixed(1)},${(h - 2 - (y - lo) / r * (h - 4)).toFixed(1)}`).join(" ");
+  const c = v[v.length - 1] >= v[0] ? "#f87171" : "#60a5fa";
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.6"/></svg>`;
+}
+let RT = null;
+async function loadRT(){ try{ const r = await fetch("rates.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ RT = await r.json(); if(state.win === "pg") render(); } }catch(e){} }
+function ratesHtml(){
+  if(!RT){ loadRT(); return `<div class="empty">불러오는 중…</div>`; }
+  const row = x => { const bond = x.cat === "bond";
+    const ch = bond ? (x.chg == null ? "" : (x.chg > 0 ? "+" : "") + (x.chg * 100).toFixed(1) + "bp") : (x.pct == null ? "" : sgnp(x.pct));
+    const pr = x.price == null ? "-" : bond ? x.price.toFixed(3) + "%" : x.price.toLocaleString("ko-KR", {maximumFractionDigits: 2});
+    return `<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:1"><div style="font-size:14px">${esc(x.name)}</div>
+      <div style="font-size:15.5px;font-weight:700;margin-top:2px">${pr} <span style="font-size:12.5px;color:${fcol(x.chg)}">${ch}</span></div></div>${spark(x.hist || [])}</div>`; };
+  const its = RT.items || [];
+  return `<div class="sec" style="margin-top:14px">── 금리</div>${its.filter(x => x.cat === "bond").map(row).join("")}
+    <div class="sec">── 금리차</div>${(RT.spreads || []).map(x => `<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:1"><div style="font-size:14px">${esc(x.name)}</div>
+      <div style="font-size:15.5px;font-weight:700;margin-top:2px;color:${x.bp < 0 ? "#60a5fa" : "var(--ink)"}">${x.bp > 0 ? "+" : ""}${x.bp}bp${x.bp < 0 ? " <span style='font-size:12px'>역전</span>" : ""}</div></div>${spark(x.hist || [])}</div>`).join("")}
+    <div class="sec">── 환율</div>${its.filter(x => x.cat === "exchange").map(row).join("")}
+    <div class="hdesc" style="margin:12px 0">그래프는 최근 약 3개월 일별 종가 · 금리 변화는 bp(0.01%p) · 환율은 하나은행 고시, 달러인덱스는 Yahoo · ${esc((RT.generated || "").slice(5, 16).replace("T", " "))} 기준</div>`;
+}
 function rsHtml(ss){
   const b = +((KR.idx || {}).KOSPI || {}).chg; if(isNaN(b)) return `<div class="empty">지수 데이터가 없습니다.</div>`;
   const rs = ss.filter(x => x.chg != null).map(x => [x, x.chg - b]).sort((a, c) => c[1] - a[1]);
@@ -1285,7 +1317,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795779270";
+const APP_VERSION = "1795779411";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
