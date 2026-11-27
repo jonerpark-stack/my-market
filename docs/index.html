@@ -122,8 +122,8 @@ details.ai summary .hint{color:var(--sub)}
 <body>
 
 <!-- 잠금 화면 -->
-<section id="lock">
-  <h1>📊 내 시황</h1>
+<section id="lock" class="hidden">
+  <h1>JP View</h1>
   <input id="pw" type="password" placeholder="비밀번호" autocomplete="current-password">
   <label><input id="remember" type="checkbox" checked> 이 기기에서 비밀번호 기억</label>
   <button class="btn-primary" id="unlockBtn">열기</button>
@@ -131,7 +131,7 @@ details.ai summary .hint{color:var(--sub)}
 </section>
 
 <!-- 앱 -->
-<section id="app" class="hidden">
+<section id="app">
   <header>
     <div class="top">
       <h1>JP View</h1>
@@ -633,13 +633,15 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 (async () => {
-  // 비밀번호 없이 운영 중이면(data.json 존재) 잠금 화면을 건너뜀
+  // 비밀번호 화면 없이 바로 열기. (암호화 운영으로 바꾼 경우에만 잠금 화면 표시)
+  $("#feed").innerHTML = `<div class="empty">불러오는 중…</div>`;
   try{
     const r = await fetch("data.json?t=" + Date.now(), {cache:"no-store"});
     if(r.ok){ await unlock(null, false); return; }
   }catch(e){}
   const saved = store.get("pw", null);
-  if(saved) unlock(saved, true);
+  if(saved){ unlock(saved, true); return; }
+  $("#app").classList.add("hidden"); $("#lock").classList.remove("hidden");
 })();
 </script>
 </body>
