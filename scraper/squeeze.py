@@ -228,6 +228,15 @@ def run():
         try:
             g = datetime.fromisoformat(json.loads(OUT.read_text())["generated"])
             if datetime.now(KST) - g < timedelta(hours=REFRESH_HOURS):
+                data = json.loads(OUT.read_text())
+                missing = [r for r in data["rows"] if not r.get("hist")]
+                if missing:  # 계산은 유지하되, 아직 이력이 없는 종목을 조금씩 채움
+                    global N_HIST, HIST_BUDGET
+                    N_HIST, HIST_BUDGET = 0, 90
+                    has = build_hist(missing + [r for r in data["rows"] if r.get("hist")])
+                    for r in data["rows"]:
+                        r["hist"] = r["t"] in has
+                    OUT.write_text(json.dumps(data, ensure_ascii=False))
                 print("[SQUEEZE] 최근 계산본 유지")
                 return
         except Exception:
