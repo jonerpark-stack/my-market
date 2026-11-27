@@ -361,6 +361,8 @@ function homeHtml(){
   return box("dash", "대시보드", dash) + box("watch", "관심 종목 · 스크리너", soon) +
     HOME_SECTIONS.map(([id, t, items]) => box(id, t, items.map(i => item(...i)).join(""))).join("");
 }
+const REPORT_EXCLUDE = ["globalmktinsight"];   // 리포트 탭에서 제외
+const INSITE = ["ehdwl"];                       // 텔레그램으로 넘기지 않고 사이트 안에서 본문 표시
 let SQ = null, sqState = Object.assign({sub:"rank", dv:5e6, sv:1e7, q:""}, store.get("sq", {}));
 const fmtUsd = v => v == null ? "-" : v >= 1e9 ? "$" + (v/1e9).toFixed(1) + "B" : v >= 1e6 ? "$" + (v/1e6).toFixed(1) + "M" : "$" + Math.round(v/1e3) + "K";
 const pctS = (v, d=1) => v == null ? "-" : (v >= 0 ? "▲" : "▼") + Math.abs(v*100).toFixed(d) + "%";
@@ -410,9 +412,9 @@ function render(){
   renderChips();
   if(state.tab === "sq"){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = sqHtml(); return; }
   if(state.tab === "home"){ $("#feed").innerHTML = homeHtml(); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
-  const list = state.tab === "report" ? DATA.posts.filter(p => p.report) : postsFor(state.tab, state.chip);
+  const list = state.tab === "report" ? DATA.posts.filter(p => p.report && !REPORT_EXCLUDE.includes(p.channel)) : postsFor(state.tab, state.chip);
   $("#feed").innerHTML = list.length
-    ? (state.tab === "report" ? grouped(list, reportHtml) : grouped(list.slice(0,150), cardHtml))
+    ? (state.tab === "report" ? grouped(list, p => INSITE.includes(p.channel) ? cardHtml(p) : reportHtml(p)) : grouped(list.slice(0,150), cardHtml))
     : `<div class="empty">표시할 글이 없습니다.</div>`;
   $("#updated").textContent = "갱신 " + fmtTime(DATA.updated);
 }
@@ -558,6 +560,27 @@ $("#feed").addEventListener("toggle", e => {
   const d = e.target; if(!d.matches || !d.matches("details.fold")) return;
   const f = store.get("fold", {}); f[d.dataset.fold] = !d.open; store.set("fold", f);
 }, true);
+{
+  let sx = 0, sy = 0, st = 0;
+  const TABS = ["home", "telegram", "report"];
+  document.addEventListener("touchstart", e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, {passive:true});
+  document.addEventListener("touchend", e => {
+    if(!DATA || $("#app").classList.contains("hidden") || !$("#sheet").classList.contains("hidden")) return;
+    if(e.target.closest(".chips,.photos,.sqf,input,textarea,.tabs")) return;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if(Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * .6 || Date.now() - st > 600) return;
+    const dir = dx < 0 ? 1 : -1;
+    if(state.tab === "telegram"){
+      const ids = DATA.channels.map(c => c.id), i = ids.indexOf(state.chip) + dir;
+      if(i >= 0 && i < ids.length){ state.chip = ids[i]; store.set("chip2", state.chip); render(); scrollTo(0,0);
+        const on = document.querySelector(".chip.on"); on && on.scrollIntoView({inline:"center", block:"nearest", behavior:"smooth"}); return; }
+    }
+    const base = state.tab === "sq" ? "home" : state.tab, j = TABS.indexOf(base) + dir;
+    if(j >= 0 && j < TABS.length){ state.tab = TABS[j]; store.set("tab2", state.tab);
+      if(state.tab === "telegram") state.chip = dir > 0 ? DATA.channels[0].id : DATA.channels[DATA.channels.length-1].id;
+      render(); scrollTo(0,0); }
+  }, {passive:true});
+}
 $("#feed").addEventListener("input", e => {
   if(e.target.id === "sqq"){ sqState.q = e.target.value; store.set("sq", sqState); const pos = e.target.selectionStart; render(); const el = $("#sqq"); el.focus(); el.setSelectionRange(pos, pos); }
 });
