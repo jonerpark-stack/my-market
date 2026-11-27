@@ -44,6 +44,10 @@ header{position:sticky;top:0;z-index:10;background:var(--bg);padding-top:env(saf
 .badge{display:inline-block;min-width:16px;height:16px;line-height:16px;padding:0 4px;margin-left:6px;border-radius:3px;background:var(--up);color:#fff;font:700 10px var(--mono);text-align:center}
 
 main{padding:0 16px calc(40px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
+details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold .fa{margin-left:auto;color:var(--sub);transition:transform .15s}
+details.fold:not([open]) .fa{transform:rotate(-90deg)}
 .sec{margin:18px 0 0;padding:6px 0;font:700 12px var(--mono);color:var(--sub);border-bottom:1px dashed #333;letter-spacing:.5px}
 .card{padding:14px 0 14px;border-bottom:1px solid var(--line)}
 .card-h{display:flex;align-items:center;gap:8px;font:700 12px var(--mono);color:var(--amber);letter-spacing:.3px}
@@ -288,7 +292,8 @@ function grouped(list, fn){
 }
 function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
-  const box = (t, body) => `<div class="sec">── ${t}</div>${body}`;
+  const fold = store.get("fold", {});
+  const box = (id, t, body) => `<details class="fold" data-fold="${id}" ${fold[id] ? "" : "open"}><summary class="sec">── ${t} <span class="fa">▾</span></summary>${body}</details>`;
   const soon = `<div class="linkcard" style="display:block;color:var(--sub);font-size:13px">관심 종목 시세 · 스크리너 · DART 공시 · 관심 종목 리포트<br>→ 키 등록 후 활성화 예정</div>`;
   const rows = latest.map(p => {
     const t = new Date(p.date).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Seoul"});
@@ -299,7 +304,7 @@ function homeHtml(){
       ${ticksHtml(p)}
       <div class="body" style="${p.ai?"color:var(--ai)":""};display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${esc(line)}</div></div>`;
   }).join("");
-  return box("관심 종목 · 스크리너", soon) + box("채널별 최신 시황", rows || `<div class="empty">아직 글이 없습니다.</div>`);
+  return box("watch", "관심 종목 · 스크리너", soon) + box("latest", "채널별 최신 시황", rows || `<div class="empty">아직 글이 없습니다.</div>`);
 }
 function render(){
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
@@ -356,8 +361,10 @@ function extractMoves(text){
     let label = line.slice(0, m.index).replace(/[:：()\[\]]/g," ").trim();
     let prev;
     do{ prev = label; label = label.replace(/\s*[\d,.]+\s*(원|달러|bp|%|p|pt|엔)?$/i,"").trim(); }while(label !== prev);
-    label = label.split(/\s{2,}|\|/)[0].trim().slice(0,14);
-    if(!label) continue;
+    label = label.split(/\s{2,}|\|/)[0].replace(/[+\-−▲▼]+$/,"").trim();
+    if(/[\d,.]+$/.test(label)) label = label.replace(/\s*[\d,.]+$/,"").trim();
+    if(!label || label.length > 12 || label.split(/\s+/).length > 3) continue;
+    if(/(에|과|와|가|는|은|를|을|서|도|로|의)$/.test(label) && label.length > 2) continue;
     const v = parseFloat(m[2]) * (/[\-−▼▽]/.test(m[1]) ? -1 : 1);
     const unit = m[3].toLowerCase() === "bp" ? "bp" : "%";
     if(unit === "%" && Math.abs(v) > 50) continue;
@@ -449,6 +456,10 @@ $("#chips").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if(!b) return;
   state.chip = b.dataset.chip; store.set("chip2", state.chip); render(); scrollTo(0,0);
 });
+$("#feed").addEventListener("toggle", e => {
+  const d = e.target; if(!d.matches || !d.matches("details.fold")) return;
+  const f = store.get("fold", {}); f[d.dataset.fold] = !d.open; store.set("fold", f);
+}, true);
 $("#feed").addEventListener("click", e => {
   const go = e.target.closest("[data-go]");
   if(go){ state.tab = "telegram"; state.chip = go.dataset.go; store.set("tab2","telegram"); store.set("chip2",state.chip); render(); scrollTo(0,0); return; }
