@@ -152,6 +152,16 @@ JSON 키 설명 (예시 문구를 그대로 쓰지 말고 원문 내용으로 �
 - watch: ⚠️로 시작하는 주목할 점 1~3개 배열
 - background: 📚로 시작하는 배경지식 0~2개 배열
 - implication: 🧭로 시작하는 시장 시사점 1문장
+- take: 카톡으로 지인에게 보낼 '내 코멘트'. 아래 말투 규칙을 반드시 따를 것 (이모지 금지, 3~5줄, 줄바꿈으로 구분)
+
+[take 말투 규칙 — 사용자의 블로그 문체]
+- 개조식 명사형 종결: "~임", "~음", "~됨", "~함", "~듦", "~생각함" 으로 끝냄 (습니다/해요체 금지)
+- 기업은 "동사", 문장은 짧게 끊고 한 줄에 한 논점
+- 논리 연결어를 자연스럽게 사용: 그런데, 즉, 다만, 따라서, 결국, 오히려, 더군다나
+- 근거 수치는 원문에 있는 것만 인용, 영어 용어는 괄호로 병기 가능
+- 긍정 요인을 말한 뒤 "다만 ~" 으로 리스크·반론을 짚는 균형 잡힌 구성
+- 마지막 줄은 "한줄 요약: ..." 또는 열린 질문("시장의 판단은..?" 처럼)으로 마무리
+- AI가 썼다는 표현, "투자 권유 아님" 같은 문구 금지
 
 [채널] {channel}
 [작성시각] {date}
@@ -172,6 +182,7 @@ def _parse_ai_json(s: str) -> dict | None:
         "watch": [str(x)[:300] for x in (obj.get("watch") or [])][:4],
         "background": [str(x)[:300] for x in (obj.get("background") or [])][:3],
         "implication": str(obj.get("implication", ""))[:300],
+        "take": str(obj.get("take", ""))[:700],
     }
 
 
@@ -281,7 +292,7 @@ def main():
     for p in posts:
         if budget <= 0:
             break
-        if p.get("ai") or len(p["text"]) < 80 or datetime.fromisoformat(p["date"]) < ai_window:
+        if (p.get("ai") and p["ai"].get("take")) or len(p["text"]) < 80 or datetime.fromisoformat(p["date"]) < ai_window:
             continue
         p["ai"] = ai_comment(p, names.get(p["channel"], p["channel"]))
         budget -= 1

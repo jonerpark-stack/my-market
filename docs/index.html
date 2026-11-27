@@ -669,7 +669,8 @@ function buildShareText(p, withAi){
   let ai = "";
   if(withAi && p.ai){
     const clean = t => String(t).replace(/\s*\[AI 일반지식\]/g, "").replace(/\s*확인 필요\.?/g, "").trim();
-    ai = "\n\n💬 제 생각\n" + [p.ai.key, ...(p.ai.watch||[]), p.ai.implication].filter(Boolean).map(clean).join("\n");
+    ai = p.ai.take ? "\n\n" + clean(p.ai.take)
+       : "\n\n" + [p.ai.key, ...(p.ai.watch||[]), p.ai.implication].filter(Boolean).map(x => clean(x).replace(/^[🔑⚠️📚🧭]\uFE0F?\s*/u, "• ")).join("\n");
   }
   return `${head}\n\n${body}${ai}\n\n🔗 원문: ${p.url}`;
 }
@@ -895,7 +896,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795762348";
+const APP_VERSION = "1795763504";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
