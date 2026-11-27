@@ -757,17 +757,55 @@ function dartHtml(cat){
   const q = dartQ.trim().toLowerCase();
   const xs = DART.items.filter(x => x.cat === cat && (!q || x.corp.toLowerCase().includes(q) || x.code.includes(q)));
   let last = "", h = `<input id="dartq" value="${esc(dartQ)}" placeholder="종목명 · 코드 검색" style="width:100%;margin:12px 0 4px;padding:11px;border-radius:6px;border:1px solid #333;background:var(--bg);color:var(--ink);font-size:15px">
-    <div class="hdesc" style="margin:4px 0 8px">최근 30일 · ${xs.length}건 · 누르면 DART 원문</div>`;
+    <div class="hdesc" style="margin:4px 0 8px">최근 30일 · ${xs.length}건${cat === "earn" ? " · 누르면 DART 원문" : ""}</div>`;
   for(const x of xs.slice(0, 300)){
     const d = x.dt.slice(4,6) + "/" + x.dt.slice(6);
     if(d !== last){ h += `<div class="sec" style="margin-top:14px">── ${d}</div>`; last = d; }
     const [tg, c] = DART_TAG(x.nm), col = c === "g" ? "#4ade80" : c === "r" ? "#f87171" : "var(--amber)";
-    h += `<a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rno}" target="_blank" rel="noopener" style="display:block;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none">
+    const insite = cat !== "earn", sm = insite ? dartSummary(x) : "";
+    h += `<a ${insite ? `data-dart="${x.rno}" href="#"` : `href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rno}" target="_blank" rel="noopener"`} style="display:block;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none">
       <div style="font-size:13px"><b>${esc(x.corp)}</b> <span style="color:var(--sub)">${x.code} · ${x.mkt}</span> <span style="color:${col};border:1px solid ${col};border-radius:4px;padding:0 5px;font-size:11.5px;margin-left:4px">${tg}</span></div>
-      <div style="font-size:13px;color:var(--sub);margin-top:3px">${esc(x.nm)}${x.who && x.who !== x.corp ? " · " + esc(x.who) : ""}</div></a>`;
+      <div style="font-size:13px;color:var(--sub);margin-top:3px">${esc(x.nm)}${x.who && x.who !== x.corp ? " · " + esc(x.who) : ""}</div>${sm ? `<div style="font-size:13px;margin-top:3px">${sm}</div>` : ""}</a>`;
   }
   return h + (xs.length ? "" : `<div class="empty">해당 공시가 없습니다.</div>`);
 }
+const DL = {repror:"보고자", isu_exctv_ofcps:"직위", isu_exctv_rgist_at:"등기 여부", isu_main_shrholdr:"주요주주", sp_stock_lmp_cnt:"소유 주식수", sp_stock_lmp_irds_cnt:"증감 주식수", sp_stock_lmp_rate:"소유 비율(%)", sp_stock_lmp_irds_rate:"증감 비율(%p)",
+  report_tp:"보고 구분", stkqy:"보유 주식수", stkqy_irds:"증감 주식수", stkrt:"보유 비율(%)", stkrt_irds:"증감 비율(%p)", ctr_stkqy:"주요계약 주식수", ctr_stkrt:"주요계약 비율(%)", report_resn:"보고 사유",
+  aqpln_stk_ostk:"취득 예정 보통주", aqpln_stk_estk:"취득 예정 기타주", aqpln_prc_ostk:"취득 예정 금액(보통주)", aqpln_prc_estk:"취득 예정 금액(기타주)", aqexpd_bgd:"취득 시작일", aqexpd_edd:"취득 종료일", aq_pp:"취득 목적", aq_mth:"취득 방법", cs_iv_bk:"위탁 증권사",
+  dppln_stk_ostk:"처분 예정 보통주", dppln_prc_ostk:"처분 예정 금액", dpstk_prc_ostk:"처분 단가", dpprpd_bgd:"처분 시작일", dpprpd_edd:"처분 종료일", dp_pp:"처분 목적", dp_m_mkt:"장내 처분", dp_m_ovtm:"시간외 처분", dp_m_otc:"장외 처분",
+  ctr_prc:"계약 금액", ctr_pd_bgd:"계약 시작일", ctr_pd_edd:"계약 종료일", ctr_pp:"계약 목적", ctr_cns_int:"계약 기관", ctr_cns_prd:"계약 예정일",
+  nstk_ostk_cnt:"신주 보통주", nstk_estk_cnt:"신주 기타주", fv_ps:"액면가", bfic_tisstk_ostk:"증자 전 보통주", ic_mthn:"증자 방식",
+  bd_tm:"회차", bd_knd:"사채 종류", bd_fta:"사채 권면 총액", bd_intr_ex:"표면 이자율(%)", bd_intr_sf:"만기 이자율(%)", bd_mtd:"만기일", bdis_mthn:"발행 방법",
+  cv_rt:"전환 비율(%)", cv_prc:"전환가액", cvisstk_cnt:"전환 주식수", cvisstk_tisstk_vs:"주식총수 대비(%)", cvrqpd_bgd:"전환 청구 시작", cvrqpd_edd:"전환 청구 종료", act_mktprcfl_cvprc_lwtrsprc:"최저 조정가액",
+  ex_prc:"행사·교환가액", nstk_isstk_cnt:"발행 주식수", nstk_isstk_tisstk_vs:"주식총수 대비(%)", expd_bgd:"행사 시작", expd_edd:"행사 종료", extg:"교환 대상", extg_stkcnt:"교환 주식수", extg_tisstk_vs:"주식총수 대비(%)",
+  fdpp_fclt:"자금: 시설", fdpp_bsninh:"자금: 영업양수", fdpp_op:"자금: 운영", fdpp_dtrp:"자금: 채무상환", fdpp_ocsa:"자금: 타법인 증권", fdpp_etc:"자금: 기타", aq_dd:"결정일"};
+const num = v => /^-?[\d,]+(\.\d+)?$/.test(v) ? v : v;
+function dartSummary(x){
+  const d = x.det; if(!d) return "";
+  const pick = (...ks) => ks.map(k => d[k]).find(v => v != null);
+  const sgn = v => { const n = parseFloat(String(v).replace(/,/g,"")); return isNaN(n) ? "" : n > 0 ? `<span style="color:#f87171">▲ ${esc(v)}주</span>` : n < 0 ? `<span style="color:#60a5fa">▼ ${esc(String(v).replace("-",""))}주</span>` : "변동 없음"; };
+  if(x.cat === "insider"){ const c = pick("sp_stock_lmp_irds_cnt","stkqy_irds"); return [d.repror, d.isu_exctv_ofcps, c != null ? sgn(c) : "", pick("sp_stock_lmp_rate","stkrt") ? "보유 " + esc(pick("sp_stock_lmp_rate","stkrt")) + "%" : ""].filter(Boolean).join(" · "); }
+  if(x.cat === "buyback"){ const a = pick("aqpln_prc_ostk","dppln_prc_ostk","ctr_prc"); return a ? esc(won(a)) : ""; }
+  const a = pick("bd_fta"), p = pick("cv_prc","ex_prc"), r = pick("cvisstk_tisstk_vs","nstk_isstk_tisstk_vs","extg_tisstk_vs");
+  if(a) return [esc(won(a)), p ? "가액 " + esc(p) + "원" : "", r ? "희석 " + esc(r) + "%" : ""].filter(Boolean).join(" · ");
+  if(d.nstk_ostk_cnt) return ["신주 " + esc(d.nstk_ostk_cnt) + "주", d.bfic_tisstk_ostk ? "희석 " + (100 * parseFloat(d.nstk_ostk_cnt.replace(/,/g,"")) / parseFloat(d.bfic_tisstk_ostk.replace(/,/g,""))).toFixed(1) + "%" : "", d.ic_mthn].filter(Boolean).join(" · ");
+  return "";
+}
+function won(v){ const n = parseFloat(String(v).replace(/,/g,"")); if(isNaN(n)) return v; return n >= 1e8 ? (n/1e8).toLocaleString("ko-KR",{maximumFractionDigits:1}) + "억원" : n.toLocaleString("ko-KR") + "원"; }
+let dartSel = null;
+function dartDetailHtml(){
+  const x = DART && DART.items.find(y => y.rno === dartSel); if(!x) return "";
+  const [tg] = DART_TAG(x.nm), d = x.det || {};
+  const rows = Object.keys(d).filter(k => DL[k]).map(k => `<tr><td style="color:var(--sub);padding:7px 10px 7px 0;white-space:nowrap;vertical-align:top">${DL[k]}</td><td style="padding:7px 0">${esc(/prc|fta|ctr_prc|fdpp/.test(k) && !/cv_prc|ex_prc|dpstk_prc/.test(k) ? won(d[k]) : d[k])}</td></tr>`).join("");
+  return `<div style="margin-top:14px;font-size:17px;font-weight:800">${esc(x.corp)} <span style="font-size:13px;color:var(--sub);font-weight:400">${x.code} · ${x.mkt}</span></div>
+    <div style="color:var(--amber);margin:6px 0 2px">${tg} · ${x.dt.slice(0,4)}.${x.dt.slice(4,6)}.${x.dt.slice(6)}</div>
+    <div style="color:var(--sub);font-size:13.5px">${esc(x.nm)}${x.who ? " · 제출 " + esc(x.who) : ""}</div>
+    ${dartSummary(x) ? `<div class="huse" style="margin-top:12px">${dartSummary(x)}</div>` : ""}
+    ${rows ? `<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:10px">${rows}</table>` : `<div class="linkcard" style="display:block;color:var(--sub);font-size:13.5px;margin-top:12px">${x.det === null ? "이 공시는 DART 요약 데이터가 없습니다." : "요약 데이터를 받아오는 중입니다 (10분 내 갱신)."}</div>`}
+    <div style="margin:22px 0 10px;font-size:12.5px"><a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rno}" target="_blank" rel="noopener" style="color:var(--sub)">DART 원문 보기 ›</a></div>`;
+}
+document.addEventListener("click", e => { const a = e.target.closest("[data-dart]"); if(!a) return; e.preventDefault(); dartSel = a.dataset.dart; dartBack = [pgId, $("#winbody") ? $("#winbody").scrollTop : 0]; openWin("dd"); }, true);
+let dartBack = null;
 document.addEventListener("input", e => { if(e.target.id === "dartq"){ dartQ = e.target.value; const p = e.target.selectionStart; render(); const i = $("#dartq"); i.focus(); i.setSelectionRange(p, p); } });
 function pageHtml(){
   if(["insider","buyback","dilute","earn"].includes(pgId)){ const w = WHEN[pgId] || [];
@@ -782,6 +820,7 @@ function pageHtml(){
 }
 function winTitle(){
   if(state.win === "pg"){ const it = HOME_SECTIONS.flatMap(x => x[2]).find(x => x[0] === pgId); return it ? it[1] : ""; }
+  if(state.win === "dd"){ const x = DART && DART.items.find(y => y.rno === dartSel); return x ? x.corp + " · 공시" : "공시"; }
   if(state.win === "sqd") return sqSel + " · SHORT SQUEEZE";
   return "SHORT SQUEEZE US";
 }
@@ -789,7 +828,7 @@ function render(keepWinScroll = true){
   const old = document.getElementById("winbody"), y = old && keepWinScroll ? old.scrollTop : 0;
   renderBase();
   if(state.win){
-    const body = state.win === "pg" ? pageHtml() : state.win === "sqd" ? sqDetailHtml() : sqHtml();
+    const body = state.win === "dd" ? dartDetailHtml() : state.win === "pg" ? pageHtml() : state.win === "sqd" ? sqDetailHtml() : sqHtml();
     $("#feed").insertAdjacentHTML("beforeend", `<div id="win"><div class="winhead"><span>${esc(winTitle())}</span>
       <button class="icon-btn" data-wclose="1" aria-label="닫기">✕</button></div><div id="winbody">${body}</div></div>`);
     $("#winbody").scrollTop = y;
@@ -1023,6 +1062,7 @@ $("#feed").addEventListener("click", e => {
   if(pgb){ const id = pgb.dataset.pg;
     if(pgb.dataset.ptab){ state.tab = pgb.dataset.ptab; store.set("tab2", state.tab); scrollTo(0,0); }  // 홈에서 누르면 해당 탭으로 이동 후 창 열기
     pgFrom = state.tab; if(LIVE[id] !== "sq") pgId = id; openWin(LIVE[id] === "sq" ? "sq" : "pg"); return; }
+  if(e.target.closest("[data-wclose]") && state.win === "dd" && dartBack){ const [pg, y] = dartBack; dartBack = null; pgId = pg; openWin("pg", y); return; }
   if(e.target.closest("[data-wclose]")){ state.win = null; render(false); return; }
   const bk = e.target.closest("[data-back]");
   if(bk){ state.tab = bk.dataset.back; store.set("tab2", state.tab); render(); scrollTo(0,0); return; }
@@ -1079,7 +1119,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795771749";
+const APP_VERSION = "1795772969";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
