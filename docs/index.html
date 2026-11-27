@@ -778,12 +778,12 @@ function dartHtml(cat){
 function dartListHtml(cat){
   const q = dartQ.trim().toLowerCase();
   const xs = DART.items.filter(x => x.cat === cat && (!q || x.corp.toLowerCase().includes(q) || x.code.includes(q)));
-  let last = "", h = `<div class="hdesc" style="margin:4px 0 8px">최근 30일 · ${xs.length}건${cat === "earn" ? " · 누르면 DART 원문" : ""}</div>`;
+  let last = "", h = `<div class="hdesc" style="margin:4px 0 8px">최근 30일 · ${xs.length}건</div>`;
   for(const x of xs.slice(0, 300)){
     const d = x.dt.slice(4,6) + "/" + x.dt.slice(6);
     if(d !== last){ h += `<div class="sec" style="margin-top:14px">── ${d}</div>`; last = d; }
     const [tg, c] = DART_TAG(x.nm), col = c === "g" ? "#4ade80" : c === "r" ? "#f87171" : "var(--amber)";
-    const insite = cat !== "earn", sm = insite ? dartSummary(x) : "";
+    const insite = true, sm = dartSummary(x);
     h += `<a ${insite ? `data-dart="${x.rno}" href="#"` : `href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rno}" target="_blank" rel="noopener"`} style="display:block;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none">
       <div style="font-size:13px"><b>${esc(x.corp)}</b> <span style="color:var(--sub)">${x.code} · ${x.mkt}</span> <span style="color:${col};border:1px solid ${col};border-radius:4px;padding:0 5px;font-size:11.5px;margin-left:4px">${tg}</span></div>
       <div style="font-size:13px;color:var(--sub);margin-top:3px">${esc(x.nm)}${x.who && x.who !== x.corp ? " · " + esc(x.who) : ""}</div>${sm ? `<div style="font-size:13px;margin-top:3px">${sm}</div>` : ""}</a>`;
@@ -801,7 +801,10 @@ const DL = {repror:"보고자", isu_exctv_ofcps:"직위", isu_exctv_rgist_at:"�
   ex_prc:"행사·교환가액", nstk_isstk_cnt:"발행 주식수", nstk_isstk_tisstk_vs:"주식총수 대비(%)", expd_bgd:"행사 시작", expd_edd:"행사 종료", extg:"교환 대상", extg_stkcnt:"교환 주식수", extg_tisstk_vs:"주식총수 대비(%)",
   fdpp_fclt:"자금: 시설", fdpp_bsninh:"자금: 영업양수", fdpp_op:"자금: 운영", fdpp_dtrp:"자금: 채무상환", fdpp_ocsa:"자금: 타법인 증권", fdpp_etc:"자금: 기타", aq_dd:"결정일"};
 const num = v => /^-?[\d,]+(\.\d+)?$/.test(v) ? v : v;
+function earnRow(x, lab){ const r = (x.tbl || []).find(t => t[0] && t[0].replace(/\s/g,"").startsWith(lab)); return r ? r.slice(1).filter(c => /\d/.test(c)) : null; }
 function dartSummary(x){
+  if(x.cat === "earn"){ const op = earnRow(x, "영업이익"), sa = earnRow(x, "매출액"); if(!op && !sa) return "";
+    return [sa ? "매출 " + esc(sa[0]) : "", op ? "영업이익 " + esc(op[0]) : ""].filter(Boolean).join(" · "); }
   const d = x.det; if(!d) return "";
   const pick = (...ks) => ks.map(k => d[k]).find(v => v != null);
   const sgn = v => { const n = parseFloat(String(v).replace(/,/g,"")); return isNaN(n) ? "" : n > 0 ? `<span style="color:#f87171">▲ ${esc(v)}주</span>` : n < 0 ? `<span style="color:#60a5fa">▼ ${esc(String(v).replace("-",""))}주</span>` : "변동 없음"; };
@@ -822,7 +825,9 @@ function dartDetailHtml(){
     <div style="color:var(--amber);margin:6px 0 2px">${tg} · ${x.dt.slice(0,4)}.${x.dt.slice(4,6)}.${x.dt.slice(6)}</div>
     <div style="color:var(--sub);font-size:13.5px">${esc(x.nm)}${x.who ? " · 제출 " + esc(x.who) : ""}</div>
     ${dartSummary(x) ? `<div class="huse" style="margin-top:12px">${dartSummary(x)}</div>` : ""}
-    ${rows ? `<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:10px">${rows}</table>` : `<div class="linkcard" style="display:block;color:var(--sub);font-size:13.5px;margin-top:12px">${x.det === null ? "이 공시는 DART 요약 데이터가 없습니다." : "요약 데이터를 받아오는 중입니다 (10분 내 갱신)."}</div>`}
+    ${x.cat === "earn" ? (x.tbl && x.tbl.length ? `<div style="overflow-x:auto;margin-top:12px"><table style="border-collapse:collapse;font-size:12.5px;min-width:100%">${x.tbl.map((t, i) => `<tr>${t.map(c => `<td style="border:1px solid var(--line);padding:6px 7px;white-space:nowrap;${i < 2 ? "color:var(--sub)" : ""}">${esc(c)}</td>`).join("")}</tr>`).join("")}</table></div><div class="hdesc" style="margin-top:6px">단위는 원문 표 기준 · 좌우로 밀어서 보기</div>`
+      : `<div class="linkcard" style="display:block;color:var(--sub);font-size:13.5px;margin-top:12px">${"tbl" in x ? "실적 표를 찾지 못했습니다." : "실적 표를 받아오는 중입니다 (수집 때마다 40건씩)."}</div>`) :
+    rows ? `<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:10px">${rows}</table>` : `<div class="linkcard" style="display:block;color:var(--sub);font-size:13.5px;margin-top:12px">${x.det === null ? "이 공시는 DART 요약 데이터가 없습니다." : "요약 데이터를 받아오는 중입니다 (10분 내 갱신)."}</div>`}
     <div style="margin:22px 0 10px;font-size:12.5px"><a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rno}" target="_blank" rel="noopener" style="color:var(--sub)">DART 원문 보기 ›</a></div>`;
 }
 document.addEventListener("click", e => { const a = e.target.closest("[data-dart]"); if(!a) return; e.preventDefault(); dartSel = a.dataset.dart; dartBack = [pgId, $("#winbody") ? $("#winbody").scrollTop : 0]; openWin("dd"); }, true);
@@ -1145,7 +1150,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795775708";
+const APP_VERSION = "1795776542";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});

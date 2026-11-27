@@ -40,7 +40,10 @@ def ep_of(nm):
     return None, False
 
 def fill_details(key, items):
-    todo = [x for x in sorted(items.values(), key=lambda x: x["rno"], reverse=True)
+    for x in items.values():   # 지난 방식으로 못 채운 건 재시도 (1회)
+        if x.get("det") is None and "det" in x and x["cat"] in ("buyback", "dilute") and not x.get("retry"):
+            del x["det"]; x["retry"] = 1
+    todo = [x for x in sorted(sorted(items.values(), key=lambda x: x["rno"], reverse=True), key=lambda x: x["cat"] == "insider")
             if x["cat"] in ("insider", "buyback", "dilute") and "det" not in x and x.get("cc")]
     calls, cache, n = 0, {}, 0
     for x in todo:
@@ -51,16 +54,51 @@ def fill_details(key, items):
         if ck not in cache:
             if calls >= DET_BUDGET: break
             p = {"crtfc_key": key, "corp_code": x["cc"]}
-            if dated: p.update(bgn_de=x["dt"], end_de=x["dt"])
+            if dated:
+                d0 = dt.datetime.strptime(x["dt"], "%Y%m%d")
+                p.update(bgn_de=(d0 - dt.timedelta(days=120)).strftime("%Y%m%d"), end_de=x["dt"])
+                ck = (ep, x["cc"], x["dt"])
             d = get(p, ep); calls += 1; time.sleep(0.15)
             cache[ck] = d.get("list", []) if d.get("status") == "000" else []
             if d.get("status") not in ("000", "013"): print("[DART] 상세", ep, d.get("status"), d.get("message"))
         rows = [r for r in cache[ck] if r.get("rcept_no") == x["rno"]]
+        if not rows and "정정" in x["nm"]:   # 정정공시는 원공시 번호로 나오는 경우 → 직전 원공시 사용
+            rows = sorted([r for r in cache[ck] if r.get("rcept_no", "") <= x["rno"]], key=lambda r: r["rcept_no"], reverse=True)[:1]
         if not rows and calls >= DET_BUDGET: break
         x["det"] = {k: v for k, v in rows[0].items() if k not in SKIP and v not in (None, "", "-")} if rows else None
         n += bool(rows)
     left = sum(1 for x in items.values() if x["cat"] in ("insider", "buyback", "dilute") and "det" not in x)
     print(f"[DART] 상세 {n}건 채움 · 호출 {calls} · 남은 {left}")
+
+EARN_BUDGET = 40
+def parse_earn(key, rno):
+    import zipfile, io, re, html
+    try:
+        with urllib.request.urlopen(f"https://opendart.fss.or.kr/api/document.xml?crtfc_key={key}&rcept_no={rno}", timeout=30) as r:
+            z = zipfile.ZipFile(io.BytesIO(r.read()))
+        raw = z.read(z.namelist()[0]).decode("utf-8", "ignore")
+    except Exception as e:
+        return None
+    cell = lambda c: re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", c))).strip()
+    for tb in re.findall(r"<TABLE.*?</TABLE>", raw, re.S | re.I):
+        trs = [[cell(c) for c in re.findall(r"<T[DHE][^>]*>(.*?)</T[DHE]>", tr, re.S | re.I)] for tr in re.findall(r"<TR.*?</TR>", tb, re.S | re.I)]
+        txt = " ".join(" ".join(t) for t in trs)
+        if "매출액" in txt and "영업이익" in txt and ("전년동기" in txt or "당해" in txt):
+            out = []
+            for t in trs:
+                t = [c for c in t if c]
+                if t and len(t) <= 12: out.append(t)
+            return out[:16]
+    return []
+
+def fill_earn(key, items):
+    todo = [x for x in sorted(items.values(), key=lambda x: x["rno"], reverse=True) if x["cat"] == "earn" and "tbl" not in x]
+    n = 0
+    for x in todo[:EARN_BUDGET]:
+        t = parse_earn(key, x["rno"])
+        if t is None: continue
+        x["tbl"] = t; n += bool(t); time.sleep(0.2)
+    print(f"[DART] 잠정실적 표 {n}건 · 남은 {max(0, len(todo) - EARN_BUDGET)}")
 
 def run():
     key = os.environ.get("DART_API_KEY")
@@ -94,6 +132,7 @@ def run():
             if page >= int(d.get("total_page", 1)): break
             page += 1; time.sleep(0.3)
     fill_details(key, items)
+    fill_earn(key, items)
     cut = (today - dt.timedelta(days=KEEP_DAYS)).strftime("%Y%m%d")
     lst = sorted([x for x in items.values() if x["dt"] >= cut], key=lambda x: x["rno"], reverse=True)
     json.dump({"generated": dt.datetime.now(KST).isoformat(timespec="minutes"), "items": lst}, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
