@@ -193,24 +193,34 @@ def yahoo_hist(t):
     return [[datetime.fromtimestamp(a, KST).date().isoformat(), round(b, 4)] for a, b in zip(ts, c) if b]
 
 
+HIST_BUDGET = 220      # 한 번 실행에 새로 받는 종목 수 (나머지는 다음 실행에서 이어서)
+HIST_STALE_DAYS = 3
+
+
 def build_hist(rows):
+    """전 종목 이력. 상위 종목은 매번, 나머지는 3일 지난 것부터 순차 갱신."""
     HIST_DIR.mkdir(exist_ok=True)
-    pick = rows[:N_HIST] + [r for r in rows[N_HIST:] if any(("급증" in x or "급등" in x) for x in r["signals"])][:30]
-    ok = 0
-    for r in pick:
+    now = time.time()
+    def age(t):
+        f = HIST_DIR / f"{t}.json"
+        return (now - f.stat().st_mtime) / 86400 if f.exists() else 1e9
+    top = [r["t"] for r in rows[:N_HIST]]
+    rest = sorted((r["t"] for r in rows[N_HIST:] if age(r["t"]) > HIST_STALE_DAYS), key=age, reverse=True)
+    todo = (top + rest)[:HIST_BUDGET]
+    for t in todo:
         try:
-            si = finra_hist(r["t"])
-            px = yahoo_hist(r["t"])
-            (HIST_DIR / f"{r['t']}.json").write_text(json.dumps({"t": r["t"], "si": si, "px": px}))
-            ok += 1
+            si = finra_hist(t)
+            px = yahoo_hist(t)
+            (HIST_DIR / f"{t}.json").write_text(json.dumps({"t": t, "si": si, "px": px}))
         except Exception as e:
-            print(f"[SQUEEZE] 이력 실패 {r['t']}: {e}", file=sys.stderr)
-        time.sleep(.2)
-    keep = {f"{r['t']}.json" for r in pick}
-    for f in HIST_DIR.glob("*.json"):
-        if f.name not in keep:
+            print(f"[SQUEEZE] 이력 실패 {t}: {e}", file=sys.stderr)
+        time.sleep(.15)
+    names = {r["t"] for r in rows}
+    for f in HIST_DIR.glob("*.json"):          # 목록에서 빠진 종목 정리
+        if f.stem not in names:
             f.unlink()
-    return {r["t"] for r in pick}
+    print(f"[SQUEEZE] 이력 갱신 {len(todo)}종목")
+    return {f.stem for f in HIST_DIR.glob("*.json")}
 
 
 def run():
