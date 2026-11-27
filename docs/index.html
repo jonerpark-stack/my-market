@@ -406,8 +406,8 @@ function homeHtml(){
   };
   const dash = `<div class="hitem" id="h-breadth"><div style="display:flex;align-items:center;gap:8px"><span class="hname">시장 체력</span><span class="htag">준비 중</span></div><div class="hdesc">52주 신고가 · 신저가 수, 상승 · 하락 종목 비율</div></div>
     <div class="hitem" id="h-funds"><div style="display:flex;align-items:center;gap:8px"><span class="hname">증시 자금</span><span class="htag">준비 중</span></div><div class="hdesc">고객예탁금 · 신용융자 잔고 추이</div></div>`;
-  const homeItem = ([iid, nm, desc]) => { const w = WHEN[iid] || []; const live = !!LIVE[iid];
-    return `<div class="hitem" id="h-${iid}" data-pg="${iid}" style="cursor:pointer">
+  const homeItem = tab => ([iid, nm, desc]) => { const w = WHEN[iid] || []; const live = !!LIVE[iid];
+    return `<div class="hitem" id="h-${iid}" data-pg="${iid}" data-ptab="${tab}" style="cursor:pointer">
       <div style="display:flex;align-items:center;gap:8px"><span class="hname">${esc(nm)}</span>
       <span class="htag ${live ? "on" : ""}">${live ? "LIVE" : "준비 중"}</span><span style="margin-left:auto;color:var(--sub)">›</span></div>
       <div class="hdesc">${esc(desc)}</div>
@@ -420,9 +420,9 @@ function homeHtml(){
       <div class="huse"><b>언제 보나</b>포트폴리오 비중(주식·채권·지역·업종)을 다시 짤 때</div><div class="huse"><b>어떻게 읽나</b>여러 하우스가 같은 방향(예: 채권 비중 확대)이면 컨센서스, 한 곳만 다르면 그 근거를 확인. 단기 매매보다 큰 그림용</div><div class="huse"><b class="o">갱신</b>3시간</div></div>`;
   return box("dash", "대시보드", dash) + box("watch", "관심 종목 · 스크리너", soon) +
     box("latest", "채널별 최신 시황", `<div style="padding-left:2px">${rows}</div>`) +
-    box("macro", "매크로 · 시장 개관", tgItem + repItem + HOME_SECTIONS[0][2].map(homeItem).join("")) +
-    box("kr", "한국 수급", HOME_SECTIONS[1][2].map(homeItem).join("")) +
-    box("us", "미국 수급", HOME_SECTIONS[2][2].map(homeItem).join(""));
+    box("macro", "매크로 · 시장 개관", tgItem + repItem + HOME_SECTIONS[0][2].map(homeItem("macro")).join("")) +
+    box("kr", "한국 수급", HOME_SECTIONS[1][2].map(homeItem("kr")).join("")) +
+    box("us", "미국 수급", HOME_SECTIONS[2][2].map(homeItem("us")).join(""));
 }
 const REPORT_EXCLUDE = ["globalmktinsight"];   // 리포트 탭에서 제외
 const INSITE = ["ehdwl"];                       // 텔레그램으로 넘기지 않고 사이트 안에서 본문 표시
@@ -830,7 +830,9 @@ $("#feed").addEventListener("input", e => {
 });
 $("#feed").addEventListener("click", e => {
   const pgb = e.target.closest("[data-pg]");
-  if(pgb){ const id = pgb.dataset.pg; pgFrom = state.tab; if(LIVE[id] !== "sq") pgId = id; openWin(LIVE[id] === "sq" ? "sq" : "pg"); return; }
+  if(pgb){ const id = pgb.dataset.pg;
+    if(pgb.dataset.ptab){ state.tab = pgb.dataset.ptab; store.set("tab2", state.tab); scrollTo(0,0); }  // 홈에서 누르면 해당 탭으로 이동 후 창 열기
+    pgFrom = state.tab; if(LIVE[id] !== "sq") pgId = id; openWin(LIVE[id] === "sq" ? "sq" : "pg"); return; }
   if(e.target.closest("[data-wclose]")){ state.win = null; render(false); return; }
   const bk = e.target.closest("[data-back]");
   if(bk){ state.tab = bk.dataset.back; store.set("tab2", state.tab); render(); scrollTo(0,0); return; }
@@ -887,7 +889,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795760287";
+const APP_VERSION = "1795760843";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
