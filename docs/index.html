@@ -51,6 +51,11 @@ details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:cen
 details.fold>summary::-webkit-details-marker{display:none}
 details.fold .fa{margin-left:auto;color:var(--sub);transition:transform .15s}
 details.fold:not([open]) .fa{transform:rotate(-90deg)}
+.hitem{padding:12px 0;border-bottom:1px solid var(--line)}
+.hname{font-weight:800;font-size:15px}
+.hdesc{color:var(--sub);font-size:13px;margin-top:2px}
+.htag{font:700 10px var(--mono);padding:1px 6px;border-radius:3px;border:1px solid #333;color:var(--sub)}
+.htag.on{background:var(--ai);border-color:var(--ai);color:#0a0a0a}
 .sec{margin:18px 0 0;padding:6px 0;font:700 12px var(--mono);color:var(--sub);border-bottom:1px dashed #333;letter-spacing:.5px}
 .card{padding:14px 0 14px;border-bottom:1px solid var(--line)}
 .card-h{display:flex;align-items:center;gap:8px;font:700 12px var(--mono);color:var(--amber);letter-spacing:.3px}
@@ -121,7 +126,7 @@ details.ai summary .hint{color:var(--sub)}
       </div>
     </div>
     <nav class="tabs" id="tabs">
-      <button class="tab on" data-tab="home">전체</button>
+      <button class="tab on" data-tab="home">홈</button>
       <button class="tab" data-tab="telegram">텔레그램 시황</button>
       <button class="tab" data-tab="report">리포트</button>
     </nav>
@@ -293,21 +298,45 @@ function grouped(list, fn){
   }
   return out;
 }
+const HOME_SECTIONS = [
+  ["macro", "매크로 · 시장 개관", [
+    ["tg", "텔레그램 시황", "증권사 시황 채널 5곳 최신 글 + AI 요약"],
+    ["cal", "한미 이벤트 캘린더", "실적 발표 · FOMC · 금통위 · 휴장일 · 지수 변경"],
+    ["heat", "한국 히트맵", "KOSPI · KOSDAQ 섹터별 등락"],
+    ["fg", "공포 · 탐욕 지수", "미국 CNN F&G · 한국 과열도"]]],
+  ["kr", "한국 수급", [
+    ["samo", "사모펀드 수급", "사모펀드 순매수 · 순매도 상위 종목"],
+    ["credit", "신용 · 대차", "신용잔고 · 대차잔고 증감 상위"],
+    ["insider", "내부자 매매", "임원 · 주요주주 장내 매수 · 매도"],
+    ["buyback", "자사주", "자사주 취득 · 소각 · 처분 공시"],
+    ["rebal", "지수 정기변경", "KOSPI200 · KOSDAQ150 편입 · 편출 예상"]]],
+  ["us", "미국 수급", [
+    ["guru", "GURU 포트폴리오", "유명 투자자 13F · 정치인 매매 공시"],
+    ["active", "US ACTIVE ETF", "ARK 등 액티브 ETF 일별 매매"],
+    ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏스퀴즈 후보"],
+    ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
+];
 function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
   const fold = store.get("fold", {});
   const box = (id, t, body) => `<details class="fold" data-fold="${id}" ${fold[id] ? "" : "open"}><summary class="sec">── ${t} <span class="fa">▾</span></summary>${body}</details>`;
   const soon = `<div class="linkcard" style="display:block;color:var(--sub);font-size:13px">관심 종목 시세 · 스크리너 · DART 공시 · 관심 종목 리포트<br>→ 키 등록 후 활성화 예정</div>`;
   const rows = latest.map(p => {
-    const t = new Date(p.date).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Seoul"});
     const line = p.ai && p.ai.key ? "AI› " + p.ai.key.replace(/^🔑\s*/,"") : p.text.split("\n").find(l=>l.trim()) || "";
     const isNew = p.id > (seen[p.channel] || 0);
-    return `<div class="card" style="cursor:pointer" data-go="${esc(p.channel)}">
+    return `<div class="card" style="cursor:pointer;padding:10px 0" data-go="${esc(p.channel)}">
       <div class="card-h"><span>${esc(chName(p.channel))}</span><span style="color:var(--sub)">${fmtTime(p.date)}</span>${isNew?'<span class="new">NEW</span>':""}</div>
-      ${ticksHtml(p)}
-      <div class="body" style="${p.ai?"color:var(--ai)":""};display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${esc(line)}</div></div>`;
+      <div class="body" style="${p.ai?"color:var(--ai)":""};display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-top:4px">${esc(line)}</div></div>`;
   }).join("");
-  return box("watch", "관심 종목 · 스크리너", soon) + box("latest", "채널별 최신 시황", rows || `<div class="empty">아직 글이 없습니다.</div>`);
+  const item = (id, name, desc) => {
+    const live = id === "tg";
+    return `<div class="hitem" ${live ? 'data-gotab="telegram" style="cursor:pointer"' : ""}>
+      <div style="display:flex;align-items:center;gap:8px"><span class="hname">${name}</span>
+      <span class="htag ${live ? "on" : ""}">${live ? "LIVE" : "준비 중"}</span></div>
+      <div class="hdesc">${desc}</div></div>${live ? `<div style="padding-left:10px;border-left:1px solid var(--line);margin:0 0 6px 2px">${rows}</div>` : ""}`;
+  };
+  return box("watch", "관심 종목 · 스크리너", soon) +
+    HOME_SECTIONS.map(([id, t, items]) => box(id, t, items.map(i => item(...i)).join(""))).join("");
 }
 function render(){
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
@@ -464,6 +493,8 @@ $("#feed").addEventListener("toggle", e => {
   const f = store.get("fold", {}); f[d.dataset.fold] = !d.open; store.set("fold", f);
 }, true);
 $("#feed").addEventListener("click", e => {
+  const gt = e.target.closest("[data-gotab]");
+  if(gt && !e.target.closest("[data-go]")){ state.tab = gt.dataset.gotab; store.set("tab2", state.tab); render(); scrollTo(0,0); return; }
   const go = e.target.closest("[data-go]");
   if(go){ state.tab = "telegram"; state.chip = go.dataset.go; store.set("tab2","telegram"); store.set("chip2",state.chip); render(); scrollTo(0,0); return; }
   const more = e.target.closest(".more");
