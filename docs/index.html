@@ -546,12 +546,14 @@ function scrRow(x){
 function scrHtml(){
   if(!SCR){ loadSCR(); return ""; }
   const ps = SCR.passed || [], nr = SCR.near || [];
-  return `<div class="rpsub" style="margin-top:14px">🔎 스크리너 통과 ${ps.length}종목 <span style="color:var(--sub);font-weight:400;font-size:12px">· 판정 ${SCR.filled}/${SCR.universe} · ${esc((SCR.generated || "").slice(5, 16).replace("T", " "))}</span></div>
-    ${ps.map(scrRow).join("") || `<div class="hdesc" style="margin:6px 0">${SCR.filled < SCR.universe ? "종목 데이터를 채우는 중입니다." : "오늘 조건을 통과한 종목이 없습니다."}</div>`}
+  return `<div class="rpsub" data-scrpass="1" style="margin-top:14px;cursor:pointer">${scrPass ? "▴" : "▾"} 🔎 스크리너 통과 ${ps.length}종목 <span style="color:var(--sub);font-weight:400;font-size:12px">· 판정 ${SCR.filled}/${SCR.universe} · ${esc((SCR.generated || "").slice(5, 16).replace("T", " "))}</span></div>
+    ${scrPass ? (ps.map(scrRow).join("") || `<div class="hdesc" style="margin:6px 0">${SCR.filled < SCR.universe ? "종목 데이터를 채우는 중입니다." : "오늘 조건을 통과한 종목이 없습니다."}</div>`) : ""}
     ${nr.length ? `<div data-scrnear="1" class="hdesc" style="margin:8px 0;cursor:pointer;color:var(--amber)">${scrNear ? "▴" : "▾"} 돌파 임박 ${nr.length}종목 (실적 관문 통과 · RSI가 시그널선 2pt 아래에서 상승 중)</div>${scrNear ? nr.map(scrRow).join("") : ""}` : ""}
     <div class="hdesc" style="margin:8px 0">통과 조건: 영업이익 3분기 연속 증가 또는 흑자 전환 + 주봉 RSI(14)가 시그널선(9주 평균)을 최근 2주 안에 상향 돌파 · 가점: RSI ≤ 50, 거래량 1.2배, 상승 다이버전스, 상승 캔들 · ⚠ 하락 캔들은 경고 · 시총 1000억 이상, 우선주·스팩 제외 · 수주잔고는 데이터 출처가 없어 미반영 · 가격은 하루 1회 + 장중 후보 1시간마다</div>`;
 }
+let scrPass = store.get("scrPass", true);
 document.addEventListener("click", e => { if(e.target.closest("[data-scrnear]")){ scrNear = !scrNear; render(); return; }
+  if(e.target.closest("[data-scrpass]")){ scrPass = !scrPass; store.set("scrPass", scrPass); render(); return; }
   const o = e.target.closest("[data-wopen2]"); if(o){ const c = o.dataset.wopen2; if(!watch.includes(c)){ watch.push(c); store.set("watch", watch); } wOpen = c; render(); } });
 function watchHtml(){
   if(!KR){ loadKR(); return `<div class="hdesc" style="margin:10px 0">불러오는 중…</div>`; }
@@ -1533,7 +1535,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795787314";
+const APP_VERSION = "1795787763";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
