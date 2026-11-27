@@ -3,8 +3,9 @@ import os, json, time, datetime as dt, urllib.request, urllib.parse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "rates.json")
 KST = dt.timezone(dt.timedelta(hours=9))
-ITEMS = [("bond", "KR3YT=RR", "국고채 3년", "%"), ("bond", "KR10YT=RR", "국고채 10년", "%"),
-         ("bond", "US2YT=RR", "미 국채 2년", "%"), ("bond", "US10YT=RR", "미 국채 10년", "%"),
+ITEMS = [("bond", "KR3YT=RR", "국고채 3년", "%"), ("bond", "KR5YT=RR", "국고채 5년", "%"), ("bond", "KR10YT=RR", "국고채 10년", "%"), ("bond", "KR30YT=RR", "국고채 30년", "%"),
+         ("bond", "US2YT=RR", "미 국채 2년", "%"), ("bond", "US3YT=RR", "미 국채 3년", "%"), ("bond", "US5YT=RR", "미 국채 5년", "%"),
+         ("bond", "US10YT=RR", "미 국채 10년", "%"), ("bond", "US30YT=RR", "미 국채 30년", "%"),
          ("exchange", "FX_USDKRW", "원/달러", "원"), ("exchange", "FX_JPYKRW", "원/엔(100엔)", "원"),
          ("exchange", "FX_EURKRW", "원/유로", "원"), ("exchange", "FX_CNYKRW", "원/위안", "원")]
 
@@ -25,7 +26,7 @@ def run():
     for cat, code, name, unit in ITEMS:
         q = urllib.parse.quote(code)
         d = (get(f"https://m.stock.naver.com/front-api/marketIndex/productDetail?category={cat}&reutersCode={q}") or {}).get("result") or {}
-        h = (get(f"https://m.stock.naver.com/front-api/marketIndex/prices?category={cat}&reutersCode={q}&page=1&pageSize=60") or {}).get("result") or []
+        h = (get(f"https://m.stock.naver.com/front-api/marketIndex/prices?category={cat}&reutersCode={q}&page=1&pageSize=70") or {}).get("result") or []
         hist = [[x["localTradedAt"][:10], f(x.get("closePrice"))] for x in h if x.get("closePrice")][::-1]
         out["items"].append({"code": code, "name": name, "unit": unit, "cat": cat, "price": f(d.get("closePrice")) or (hist[-1][1] if hist else None),
                              "chg": f(d.get("fluctuations")), "pct": f(d.get("fluctuationsRatio")), "at": d.get("localTradedAt", ""), "hist": hist})

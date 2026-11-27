@@ -957,12 +957,19 @@ function ratesHtml(){
     const pr = x.price == null ? "-" : bond ? x.price.toFixed(3) + "%" : x.price.toLocaleString("ko-KR", {maximumFractionDigits: 2});
     return `<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:1"><div style="font-size:14px">${esc(x.name)}</div>
       <div style="font-size:15.5px;font-weight:700;margin-top:2px">${pr} <span style="font-size:12.5px;color:${fcol(x.chg)}">${ch}</span></div></div>${spark(x.hist || [])}</div>`; };
-  const its = RT.items || [];
-  return `<div class="sec" style="margin-top:14px">── 금리</div>${its.filter(x => x.cat === "bond").map(row).join("")}
+  const its = (RT.items || []).filter(x => x.price != null);
+  const chgAt = (x, n) => { const h = x.hist || []; if(h.length <= n) return null; return (x.price - h[h.length - 1 - n][1]) * 100; };
+  const bp = v => v == null ? `<td style="text-align:right;color:var(--sub)">-</td>` : `<td style="text-align:right;color:${fcol(v)}">${v > 0 ? "+" : ""}${v.toFixed(1)}</td>`;
+  const tbl = (nat) => { const xs = its.filter(x => x.cat === "bond" && x.code.startsWith(nat)); if(!xs.length) return "";
+    return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 4px"><tr style="color:var(--sub);font-size:11.5px"><td>만기</td><td style="text-align:right">금리</td><td style="text-align:right">1일</td><td style="text-align:right">1주</td><td style="text-align:right">1개월</td><td style="text-align:right">3개월</td></tr>
+      ${xs.map(x => `<tr style="border-top:1px solid var(--line)"><td style="padding:7px 0">${esc(x.name.replace(/^(국고채|미 국채) /, ""))}</td><td style="text-align:right;font-weight:700">${x.price.toFixed(3)}</td>${bp(x.chg == null ? null : x.chg * 100)}${bp(chgAt(x, 5))}${bp(chgAt(x, 21))}${bp(chgAt(x, 62))}</tr>`).join("")}</table>`; };
+  return `<div class="sec" style="margin-top:14px">── 한국 국고채 <span style="color:var(--sub);font-weight:400;font-size:12px">변화 bp</span></div>${tbl("KR")}
+    <div class="sec">── 미국 국채 <span style="color:var(--sub);font-weight:400;font-size:12px">변화 bp</span></div>${tbl("US")}
+    <div class="sec">── 금리 추이</div>${its.filter(x => x.cat === "bond").map(row).join("")}
     <div class="sec">── 금리차</div>${(RT.spreads || []).map(x => `<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:1"><div style="font-size:14px">${esc(x.name)}</div>
       <div style="font-size:15.5px;font-weight:700;margin-top:2px;color:${x.bp < 0 ? "#60a5fa" : "var(--ink)"}">${x.bp > 0 ? "+" : ""}${x.bp}bp${x.bp < 0 ? " <span style='font-size:12px'>역전</span>" : ""}</div></div>${spark(x.hist || [])}</div>`).join("")}
     <div class="sec">── 환율</div>${its.filter(x => x.cat === "exchange").map(row).join("")}
-    <div class="hdesc" style="margin:12px 0">그래프는 최근 약 3개월 일별 종가 · 금리 변화는 bp(0.01%p) · 환율은 하나은행 고시, 달러인덱스는 Yahoo · ${esc((RT.generated || "").slice(5, 16).replace("T", " "))} 기준</div>`;
+    <div class="hdesc" style="margin:12px 0">1주=5영업일·1개월=21·3개월=62 영업일 전 대비 · 그래프는 최근 약 3개월 일별 종가 · 금리 변화는 bp(0.01%p) · 환율은 하나은행 고시, 달러인덱스는 Yahoo · ${esc((RT.generated || "").slice(5, 16).replace("T", " "))} 기준</div>`;
 }
 function rsHtml(ss){
   const b = +((KR.idx || {}).KOSPI || {}).chg; if(isNaN(b)) return `<div class="empty">지수 데이터가 없습니다.</div>`;
@@ -1317,7 +1324,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795779411";
+const APP_VERSION = "1795779473";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
