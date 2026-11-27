@@ -411,13 +411,13 @@ function homeHtml(){
       <div style="display:flex;align-items:center;gap:8px"><span class="hname">${esc(nm)}</span>
       <span class="htag ${live ? "on" : ""}">${live ? "LIVE" : "준비 중"}</span><span style="margin-left:auto;color:var(--sub)">›</span></div>
       <div class="hdesc">${esc(desc)}</div>
-      ${w.length ? `<div class="huse"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>쓰임새</b>${esc(w[1])}</div><div class="huse"><b class="o">갱신</b>${esc(w[2])}</div>` : ""}</div>`; };
+      ${w.length ? `<div class="huse"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div><div class="huse"><b class="o">갱신</b>${esc(w[2])}</div>` : ""}</div>`; };
   const tgItem = `<div class="hitem" data-gotab="telegram" style="cursor:pointer"><div style="display:flex;align-items:center;gap:8px"><span class="hname">텔레그램 시황</span><span class="htag on">LIVE</span><span style="margin-left:auto;color:var(--sub)">›</span></div>
       <div class="hdesc">증권사 시황 채널 5곳 최신 글 + AI 요약 · 카톡 공유</div>
-      <div class="huse"><b>언제 보나</b>아침 장 시작 전 · 장중 · 미국장 마감 후</div><div class="huse"><b>쓰임새</b>오늘 시장의 큰 흐름과 증권사 시각을 빠르게 훑을 때</div><div class="huse"><b class="o">갱신</b>10분</div></div>`;
+      <div class="huse"><b>언제 보나</b>시장이 크게 움직였는데 이유를 모를 때, 매매 전 시장 분위기를 확인할 때</div><div class="huse"><b>어떻게 읽나</b>여러 증권사가 같은 이유를 짚으면 시장 합의, 의견이 갈리면 방향성이 불확실한 구간. AI 요약으로 핵심 이슈를 빠르게 비교</div><div class="huse"><b class="o">갱신</b>10분</div></div>`;
   const repItem = `<div class="hitem" data-gotab="report" style="cursor:pointer"><div style="display:flex;align-items:center;gap:8px"><span class="hname">리포트</span><span class="htag on">LIVE</span><span style="margin-left:auto;color:var(--sub)">›</span></div>
       <div class="hdesc">해외 하우스뷰(블랙록·JP모건·골드만·연준) 한국어 요약 · 국내 채널 리포트</div>
-      <div class="huse"><b>언제 보나</b>주말 · 시간 여유 있을 때</div><div class="huse"><b>쓰임새</b>큰 그림(자산배분·업종 전망)을 정리할 때</div><div class="huse"><b class="o">갱신</b>3시간</div></div>`;
+      <div class="huse"><b>언제 보나</b>포트폴리오 비중(주식·채권·지역·업종)을 다시 짤 때</div><div class="huse"><b>어떻게 읽나</b>여러 하우스가 같은 방향(예: 채권 비중 확대)이면 컨센서스, 한 곳만 다르면 그 근거를 확인. 단기 매매보다 큰 그림용</div><div class="huse"><b class="o">갱신</b>3시간</div></div>`;
   return box("dash", "대시보드", dash) + box("watch", "관심 종목 · 스크리너", soon) +
     box("latest", "채널별 최신 시황", `<div style="padding-left:2px">${rows}</div>`) +
     box("macro", "매크로 · 시장 개관", tgItem + repItem + HOME_SECTIONS[0][2].map(homeItem).join("")) +
@@ -566,22 +566,22 @@ const PLAN = {
 const SEC_TABS = {macro: 0, kr: 1, us: 2};
 // 홈 화면용: 언제 보면 좋은지 · 갱신 주기
 const WHEN = {
-  rates: ["아침 장 시작 전, 금리·환율이 크게 움직인 날", "원화 약세·미 금리 급등이 외국인 매도로 이어지는지 판단할 때", "매일"],
-  earn: ["실적 시즌(1·4·7·10월 초) 장중", "잠정실적이 예상보다 좋거나 나쁜 종목을 빠르게 걸러낼 때", "공시 즉시"],
-  cal: ["주말·월요일 아침에 한 주 계획 세울 때", "FOMC·실적 발표 전후 변동성에 대비할 때", "평일 2회"],
-  heat: ["장중 수시로", "오늘 어느 업종으로 돈이 몰리는지 한눈에 볼 때", "장중 1시간"],
-  fg: ["급등·급락 다음 날", "시장이 공포 구간(역발상 매수)인지 과열 구간(비중 축소)인지 점검할 때", "매일"],
-  flow: ["장 마감 후", "외국인·기관이 사는 업종·종목을 따라갈 때", "매일"],
-  samo: ["장 마감 후", "사모펀드가 며칠 연속 사는 중소형주를 찾을 때", "매일(전일 기준)"],
-  credit: ["급등 테마주 점검 시", "빚투 과열(신용 급증)이나 공매도 쌓임(대차 급증)을 확인할 때", "매일"],
-  insider: ["공시 확인 루틴(아침·저녁)", "임원·대주주가 자기 돈으로 사는 종목을 찾을 때", "공시 즉시"],
-  buyback: ["공시 확인 루틴", "자사주 매입·소각으로 주주환원이 강해지는 종목을 볼 때", "공시 즉시"],
-  dilute: ["매수 전 최종 점검", "유상증자·CB 발행으로 지분 희석 위험이 있는 종목을 피할 때", "공시 즉시"],
-  rebal: ["6월·12월 정기변경 한 달 전부터", "편입 예상 종목의 패시브 매수세를 노릴 때", "평일 2회"],
-  guru: ["분기 13F 공시 직후(2·5·8·11월 중순)", "유명 투자자·정치인이 새로 산 미국 종목을 볼 때", "분기·공시 즉시"],
-  active: ["미국장 마감 후(한국 아침)", "ARK 등 액티브 ETF가 매일 사고파는 종목을 따라갈 때", "매일"],
-  squeeze: ["미국장 시작 전(한국 밤)", "공매도가 쌓인 종목 중 급등(숏스퀴즈) 신호가 나온 종목을 찾을 때", "6시간"],
-  reddit: ["아침·밤 수시로", "개인투자자 관심이 급증하는 미국 종목과 서학개미 화제를 볼 때", "매일 수회"]
+  rates: ["환율·미 국채금리가 급변할 때, 외국인 수급이 갑자기 바뀔 때", "원/달러 급등(원화 약세)과 미 10년물 급등이 겹치면 외국인 매도·성장주 약세 압력. 장단기 금리차 역전→정상화는 경기 국면 전환 신호로 읽음", "매일"],
+  earn: ["실적 시즌, 또는 주가가 실적 기대만으로 많이 오른 종목을 볼 때", "잠정실적이 기대를 크게 웃돌면 이후 이익 추정 상향 → 추세 지속 가능성. 매출은 늘었는데 영업이익이 줄면 마진 악화 경고", "공시 즉시"],
+  cal: ["FOMC·CPI·대형주 실적 같은 이벤트를 앞두고 비중을 정할 때", "큰 이벤트 직전엔 변동성이 커지므로 신규 매수를 미루거나 분할. 지수 정기변경일 전후엔 편입 종목 수급 왜곡이 생김", "평일 2회"],
+  heat: ["지수는 오르는데 내 종목은 안 오를 때, 주도 업종이 바뀌는 것 같을 때", "특정 업종만 빨간 '쏠림 장'인지, 전반이 오르는 '확산 장'인지 구분. 주도 업종이 바뀌는 첫 신호를 잡는 데 유용", "장중 1시간"],
+  fg: ["급등·급락으로 판단이 흔들릴 때, 비중을 늘릴지 줄일지 고민될 때", "극단적 공포(25 이하)는 역발상 매수 후보 구간, 극단적 탐욕·과열(75 이상)은 추격 매수 자제·비중 축소 구간. 단 극단값은 오래 지속될 수 있어 타이밍 도구가 아닌 분위기 점검용", "매일"],
+  flow: ["지수 방향이 애매할 때, 대형주 비중을 정할 때", "외국인이 며칠 연속 순매수하는 업종은 추세가 이어지는 경우가 많음. 외국인 매도 + 개인 매수 조합은 지수 고점권 경고로 자주 해석됨", "매일"],
+  samo: ["대형주보다 중소형 개별주 장세일 때", "사모펀드가 며칠 연속 사는 중소형주는 이벤트(실적·M&A·테마)를 선반영하는 경우가 있음. 반대로 대량 매도 전환은 차익실현 신호", "매일(전일 기준)"],
+  credit: ["테마주·개인 매수가 몰린 급등 종목을 볼 때", "신용잔고 급증은 빚투 과열 → 하락 시 반대매매로 낙폭 확대 위험. 대차잔고 급증은 공매도 대기 물량, 대차 급감은 숏커버(상승 압력) 신호", "매일"],
+  insider: ["주가가 크게 빠진 뒤 바닥을 가늠할 때", "임원·대주주의 장내 매수(특히 여러 명 동시 매수)는 내부자가 저평가로 본다는 신호로 통계적으로 의미가 큼. 매도는 개인 사정도 많아 신호 약함", "공시 즉시"],
+  buyback: ["배당·주주환원 테마, 밸류업 국면일 때", "취득 후 '소각'까지 하면 주당가치가 실제로 오름(신호 강함). 취득만 하고 소각하지 않거나 처분하면 효과 제한", "공시 즉시"],
+  dilute: ["매수 전 최종 점검, 특히 적자·중소형주", "유상증자·CB·BW는 주식 수가 늘어 기존 주주 몫이 희석됨. CB 전환가액이 현재가 근처면 전환 물량 출회로 상단이 막힐 수 있음", "공시 즉시"],
+  rebal: ["6월·12월 정기변경 1~2개월 전", "편입 유력 종목은 발표 전후 패시브 자금 유입 기대로 선반영되는 경향, 편출 예상 종목은 매도 압력. 실제 발표일·적용일 전후 변동성 주의", "평일 2회"],
+  guru: ["분기 13F 공시 직후, 미국 종목 아이디어가 필요할 때", "여러 유명 투자자가 동시에 새로 산 종목, 비중을 크게 늘린 종목에 주목. 13F는 최대 45일 늦은 자료라 단기 매매보다 중장기 아이디어용", "분기·공시 즉시"],
+  active: ["미국 성장주·테마 흐름을 볼 때", "ARK 등이 며칠 연속 사거나 파는 종목은 매니저의 확신 변화를 보여줌. 다만 액티브 ETF 매매는 자금 유출입 영향도 커서 단독 신호로는 약함", "매일"],
+  squeeze: ["공매도가 많은 종목에 악재가 덜 나오거나 호재가 나올 때", "숏커버 일수가 길고 잔고가 늘어난 종목에 거래량 급증 + 급등이 겹치면 숏스퀴즈 가능성. 반대로 잔고 증가 + 주가 하락은 공매도 세력이 맞고 있는 중", "6시간"],
+  reddit: ["개인투자자 쏠림 장세, 밈 주식 장세일 때", "언급 급증은 단기 변동성 확대 신호(상승·하락 모두). 숏스퀴즈 지표와 겹치면 급등 가능성이 커지지만 고점 추격 위험도 큼", "매일 수회"]
 };
 let pgId = null, pgFrom = "macro";
 function secListHtml(tab){
@@ -599,7 +599,7 @@ function pageHtml(){
   const it = all.find(x => x[0] === pgId) || ["", "", ""];
   const w = WHEN[pgId] || [];
   return `<div class="hdesc" style="margin-top:12px">${esc(it[2])}</div>
-    ${w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>쓰임새</b>${esc(w[1])}</div><div class="huse"><b class="o">갱신</b>${esc(w[2])}</div>` : ""}
+    ${w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div><div class="huse"><b class="o">갱신</b>${esc(w[2])}</div>` : ""}
     <div class="sec">── 준비 중</div>
     <div class="linkcard" style="display:block;color:var(--sub);font-size:13.5px;line-height:1.7">${esc(PLAN[pgId] || "곧 추가됩니다.")}</div>`;
 }
@@ -887,7 +887,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795760139";
+const APP_VERSION = "1795760287";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
