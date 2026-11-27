@@ -4,7 +4,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "krmkt.json")
 HIST = os.path.join(ROOT, "data", "kr", "flows.json")
 KST = dt.timezone(dt.timedelta(hours=9))
-DETAIL_EVERY_MIN = 30
+DETAIL_EVERY_MIN = 8
 
 def get(path):
     req = urllib.request.Request("https://m.stock.naver.com" + path, headers={"User-Agent": "Mozilla/5.0"})
@@ -47,7 +47,7 @@ def run():
         prev = {s["no"]: s for s in out["sectors"]}
         last = old.get("sector_detail_at", "")
         detail = not last or (now - dt.datetime.fromisoformat(last)).total_seconds() > DETAIL_EVERY_MIN * 60
-        secs = []
+        secs, allst = [], {}
         for x in g["groups"]:
             s = {"no": x["no"], "name": x["name"], "chg": f(x.get("changeRate")), "n": x.get("totalCount"),
                  "up": x.get("riseCount"), "dn": x.get("fallCount"), "stocks": prev.get(x["no"], {}).get("stocks", [])}
@@ -60,6 +60,9 @@ def run():
                     if len(part) < 100: break
                     pg += 1; time.sleep(0.1)
                 d = {"stocks": list(st)}
+                for y in st:
+                    allst[y.get("itemCode")] = [y.get("itemCode"), y.get("stockName"), f(y.get("fluctuationsRatio")), f(y.get("marketValue")),
+                                                "Q" if str(y.get("sosok")) == "1" or (y.get("stockExchangeType") or {}).get("code") == "KQ" else "K", x["name"]]
                 if st:
                     st = sorted(st, key=lambda y: -(f(y.get("marketValue")) or 0))[:12]
                     s["stocks"] = [{"c": y.get("itemCode"), "n": y.get("stockName"), "chg": f(y.get("fluctuationsRatio")), "mv": f(y.get("marketValue"))} for y in st]
@@ -68,6 +71,13 @@ def run():
             elif x["no"] in prev: s["mv"] = prev[x["no"]].get("mv")
             secs.append(s)
         out["sectors"] = secs
+        for mk, tag in (("KOSPI", "K"), ("KOSDAQ", "Q")):
+            for pg in (1, 2, 3):
+                mv = get(f"/api/stocks/marketValue/{mk}?page={pg}&pageSize=100")
+                for y in (mv or {}).get("stocks") or []:
+                    if y.get("itemCode") in allst: allst[y["itemCode"]][4] = tag
+        if allst: out["stocks"] = sorted(allst.values(), key=lambda y: -(y[3] or 0))
+        elif old.get("stocks"): out["stocks"] = old["stocks"]
         out["sector_detail_at"] = now.isoformat(timespec="minutes") if detail else last
     os.makedirs(os.path.dirname(HIST), exist_ok=True)
     json.dump(hist, open(HIST, "w", encoding="utf-8"), ensure_ascii=False)
