@@ -989,7 +989,7 @@ const GRP = {"반도체":["반도체와반도체장비"],"IT·전자부품":["�
   "운송·물류":["항공사","해운사","항공화물운송과물류","도로와철도운송","운송인프라"],"유통·음식료":["식품","음료","담배","식품과기본식료품소매","백화점과일반상점","인터넷과카탈로그소매","전문소매"],
   "화장품·소비재":["화장품","섬유,의류,신발,호화품","가정용품","가정용기기와용품","가구","레저용장비와제품","호텔,레스토랑,레저","교육서비스","다각화된소비자서비스"]};
 const SEC2GRP = {}; for(const [g, xs] of Object.entries(GRP)) xs.forEach(x => SEC2GRP[x] = g);
-let hmMkt = store.get("hmMkt", "K"), hmEq = false, hmGreen = store.get("hmGreen2", true), hmQ = "", hmPick = null;
+let hmZoom = 1, hmMkt = store.get("hmMkt", "K"), hmEq = false, hmGreen = store.get("hmGreen2", true), hmQ = "", hmPick = null;
 function squarify(items, x, y, w, h){   // items: [{v,...}] 큰 순서 → 각 item에 x,y,w,h 부여
   const out = [], tot = items.reduce((a, b) => a + b.v, 0); if(!tot || w <= 0 || h <= 0) return out;
   const sc = w * h / tot, rest = items.map(it => Object.assign({}, it, {a: it.v * sc}));
@@ -1026,7 +1026,9 @@ function heatHtml(){
     ${[["구성", top.length + "종목"], ["시총가중", `<span style="color:${hmColor(wavg)}">${sgnp(wavg)}</span>`], ["단순평균", `<span style="color:${hmColor(avg)}">${sgnp(avg)}</span>`],
        ["상승", `<span style="color:${hmColor(3)}">${up}</span>`], ["하락", `<span style="color:${hmColor(-3)}">${dn}</span>`], ["시총 합계", Math.round(sum / 10000).toLocaleString() + "조"]]
       .map(([k, v]) => `<div style="border:1px solid var(--line);border-radius:5px;padding:5px 7px"><div style="color:var(--sub)">${k}</div><div style="font-weight:700;font-size:14px">${v}</div></div>`).join("")}</div>
-    <div id="hmpick">${hmPickHtml()}</div><div id="hmap" style="position:relative;width:100%;margin-bottom:8px"></div>
+    <div id="hmpick">${hmPickHtml()}</div>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">${[1, 2, 3].map(z => `<button class="act" data-hmz="${z}" style="padding:4px 10px;font-size:12px;${hmZoom === z ? "color:#111;background:var(--amber);border-color:var(--amber)" : ""}">${z === 1 ? "기본" : z + "배"}</button>`).join("")}<span class="hdesc">확대하면 작은 종목 이름까지 보임 · 상하좌우로 밀어서 이동</span></div>
+    <div id="hmwrap" class="noswipe" style="overflow:auto;-webkit-overflow-scrolling:touch;max-height:${hmZoom > 1 ? "75vh" : "none"};margin-bottom:8px;border-radius:4px"><div id="hmap" style="position:relative"></div></div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--sub);margin-bottom:10px"><div style="display:flex">${[-3,-2,-1,0,1,2,3].map(c => `<span style="width:20px;height:10px;background:${hmColor(c)}"></span>`).join("")}</div>-3% · 0 · +3% 포화 · 1일 · ${esc((KR.generated || "").slice(11, 16))} 기준</div>
     <div class="hdesc" style="margin-bottom:12px">시총 상위 200종목 · 칸 크기 = ${hmEq ? "동일" : "시가총액"} · 업종은 네이버 분류를 묶은 것 · 칸을 누르면 종목 정보 · 1주·1개월 등 기간 수익률은 아직 없음</div>`;
   setTimeout(drawHmap, 0);
@@ -1044,7 +1046,8 @@ function hmPickHtml(){
 }
 function drawHmap(){
   const box = document.getElementById("hmap"); if(!box || !KR) return;
-  const W = box.clientWidth, H = Math.round(W * 1.75), q = hmQ.trim().toLowerCase();
+  const W0 = document.getElementById("hmwrap").clientWidth, W = W0 * hmZoom, H = Math.round(W0 * 1.75) * hmZoom, q = hmQ.trim().toLowerCase();
+  box.style.width = W + "px";
   const top = (KR.stocks || []).filter(y => y[4] === hmMkt && y[3]).slice(0, 200);
   const g = {}; top.forEach(y => { const k = SEC2GRP[y[5]] || "지주·기타"; (g[k] = g[k] || []).push(y); });
   const val = y => hmEq ? 1 : y[3];
@@ -1057,7 +1060,7 @@ function drawHmap(){
     if(hd) html += `<div style="height:${hd}px;font-size:11px;font-weight:700;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 4px;background:#222">${esc(G.k)} <span style="color:${hmColor(ch * 3)}">${sgnp(ch)}</span></div>`;
     for(const c of squarify(G.ys.map(y => ({v: val(y), s: y})).sort((a, b) => b.v - a.v), 0, hd, G.w - 2, G.h - hd - 2)){
       const y = c.s, hit = q && (y[1].toLowerCase().includes(q) || y[0].includes(q)), sel = hmPick === y[0];
-      const fs = Math.max(8, Math.min(16, Math.sqrt(c.w * c.h) / 5)), lab = c.w > 26 && c.h > 18;
+      const fs = Math.max(7, Math.min(16, Math.sqrt(c.w * c.h) / 5, c.w / 3.2)), lab = c.w > 16 && c.h > 11;
       html += `<div data-hm="${y[0]}" style="position:absolute;left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px;box-sizing:border-box;border:${hit || sel ? "2px solid #fff" : "1px solid #111"};background:${hmColor(y[2])};overflow:hidden;color:#fff;text-align:center;display:flex;flex-direction:column;justify-content:center;line-height:1.15;cursor:pointer;${q && !hit ? "opacity:.45" : ""}">
         ${lab ? `<div style="font-size:${fs}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px">${esc(y[1])}</div>${c.h > fs * 2.4 ? `<div style="font-size:${fs * 0.85}px">${sgnp(y[2])}</div>` : ""}` : ""}</div>`;
     }
@@ -1068,6 +1071,7 @@ function drawHmap(){
 document.addEventListener("click", e => {
   const c = e.target.closest("[data-hm]"); if(c){ hmPick = hmPick === c.dataset.hm ? null : c.dataset.hm; $("#hmpick").innerHTML = hmPickHtml(); drawHmap(); return; }
   const k = e.target.closest("[data-hmk]"); if(k){ hmMkt = k.dataset.hmk; store.set("hmMkt", hmMkt); heatSort = "mv"; hmPick = null; render(); return; }
+  const z = e.target.closest("[data-hmz]"); if(z){ hmZoom = +z.dataset.hmz; render(); return; }
   if(e.target.closest("[data-hmeq]")){ hmEq = !hmEq; render(); return; }
   if(e.target.closest("[data-hmg]")){ hmGreen = !hmGreen; store.set("hmGreen2", hmGreen); render(); return; }
 });
@@ -1571,7 +1575,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795789284";
+const APP_VERSION = "1795789363";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
