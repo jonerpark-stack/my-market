@@ -337,7 +337,7 @@ function foreignHtml(){
   }).join("");
   return `<details class="fold" id="sec-foreign" data-fold="foreign" ${fold.foreign ? "" : "open"}><summary class="sec">── 해외 · 하우스뷰 <span class="fa">▾</span></summary>
     <div class="hdesc" style="margin:8px 0">블랙록 · JP모건 · 뱅가드 · 연준 등 공개 리포트를 Gemini가 한국어로 요약합니다.</div>${rows || '<div class="empty">아직 수집된 리포트가 없습니다</div>'}</details>
-    <details class="fold" id="sec-local" data-fold="local" ${fold.local ? "" : "open"}><summary class="sec">── 국내 · 채널 리포트 <span class="fa">▾</span></summary>`;
+    <details class="fold" id="sec-local" data-fold="local" ${fold.local ? "" : "open"}><summary class="sec">── 국내 리포트 <span class="fa">▾</span></summary>`;
 }
 function reportHtml(p){
   const title = (p.docs && p.docs[0]) || p.text.split("\n").find(l => l.trim()) || "리포트";
@@ -629,7 +629,11 @@ function renderBase(){
   renderChips();
   if(SEC_TABS[state.tab] != null){ $("#chips").classList.add("hidden"); $("#feed").innerHTML = secListHtml(state.tab); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
   if(state.tab === "home"){ $("#feed").innerHTML = homeHtml(); $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return; }
-  const list = state.tab === "report" ? DATA.posts.filter(p => p.report && !REPORT_EXCLUDE.includes(p.channel)) : postsFor(state.tab, state.chip);
+  const list = state.tab === "report" ? [] : postsFor(state.tab, state.chip);
+  if(state.tab === "report"){
+    $("#feed").innerHTML = foreignHtml() + (FR ? `<div class="hdesc" style="margin:10px 0">DOC_POOL 채널을 연결하면 증권사 리포트가 섹터별로 정리됩니다.</div></details>` : "");
+    $("#updated").textContent = "갱신 " + fmtTime(DATA.updated); return;
+  }
   $("#feed").innerHTML = list.length
     ? (state.tab === "report" ? foreignHtml() + grouped(list, p => INSITE.includes(p.channel) ? cardHtml(p) : reportHtml(p)) + (FR ? "</details>" : "") : grouped(list.slice(0,150), cardHtml))
     : `<div class="empty">표시할 글이 없습니다.</div>`;
@@ -805,7 +809,7 @@ function buildMenu(){
   $("#dnav").innerHTML = `<h3>JP View 목차</h3>
     <details open><summary class="l1">홈</summary>${l3("home:dash", "대시보드")}${l3("home:watch", "관심 종목 · 스크리너")}${l3("home:latest", "채널별 최신 시황")}</details>
     <details><summary class="l1">텔레그램</summary>${DATA.channels.map(c => l3("ch:" + c.id, c.name)).join("")}</details>
-    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}${l3("rep:foreign", "해외 · 하우스뷰")}${l3("rep:local", "국내 · 채널 리포트")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>
+    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}${l3("rep:foreign", "해외 · 하우스뷰")}${l3("rep:local", "국내 리포트")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>
     ${sec("macro")}${sec("kr")}${sec("us")}`;
 }
 function menu(open){ if(open) buildMenu(); $("#drawer").classList.toggle("hidden", !open); }
@@ -889,7 +893,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795761857";
+const APP_VERSION = "1795761917";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
