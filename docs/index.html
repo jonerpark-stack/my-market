@@ -182,7 +182,7 @@ details.ai summary .hint{color:var(--sub)}
     <h2>💬 카카오톡으로 보내기</h2>
     <textarea id="shareText"></textarea>
     <div class="opts">
-      <label><input type="checkbox" id="optAi" checked> 🤖 AI 코멘트 포함</label>
+      <label><input type="checkbox" id="optAi" checked> 💬 코멘트 포함</label>
       <label><input type="checkbox" id="optChart" checked> 📊 차트 이미지</label>
       
     </div>
@@ -668,7 +668,8 @@ function buildShareText(p, withAi){
   if(lines.length > 14) body += "\n… (이하 원문 참고)";
   let ai = "";
   if(withAi && p.ai){
-    ai = "\n\n🤖 AI 코멘트\n" + [p.ai.key, ...(p.ai.watch||[]), p.ai.implication].filter(Boolean).join("\n");
+    const clean = t => String(t).replace(/\s*\[AI 일반지식\]/g, "").replace(/\s*확인 필요\.?/g, "").trim();
+    ai = "\n\n💬 제 생각\n" + [p.ai.key, ...(p.ai.watch||[]), p.ai.implication].filter(Boolean).map(clean).join("\n");
   }
   return `${head}\n\n${body}${ai}\n\n🔗 원문: ${p.url}`;
 }
@@ -734,8 +735,8 @@ function openShare(uid){
   if(!sharePost) return;
   $("#optAi").checked = !!sharePost.ai; $("#optAi").disabled = !sharePost.ai;
   $("#aiOff").textContent = sharePost.ai ? "" :
-    (isLinkOnly(sharePost) || sharePost.text.length < 80) ? "ⓘ 링크만 있거나 짧은 글이라 AI 코멘트가 없습니다"
-    : "ⓘ AI 코멘트가 아직 없습니다 (Gemini 키 등록 후 자동 생성)";
+    (isLinkOnly(sharePost) || sharePost.text.length < 80) ? "ⓘ 링크만 있거나 짧은 글이라 코멘트가 없습니다"
+    : "ⓘ 코멘트가 아직 없습니다";
   $("#shareText").value = buildShareText(sharePost, $("#optAi").checked);
   chartBlob = null;
   const canvas = drawChart(sharePost);
@@ -894,7 +895,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795762084";
+const APP_VERSION = "1795762348";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
