@@ -501,7 +501,7 @@ const HOME_SECTIONS = [
     ["squeeze", "SHORT SQUEEZE", "공매도 잔고 · 숏커버 일수 · 스퀴즈 점수"],
     ["reddit", "REDDIT ISSUE", "Reddit 화제 종목 · 서학개미 관심"]]]
 ];
-const LIVE = {tg: "telegram", squeeze: "sq"};
+const LIVE = {tg: "telegram", squeeze: "sq", insider: 1, buyback: 1, dilute: 1, earn: 1};
 function homeHtml(){
   const latest = DATA.channels.map(c => DATA.posts.find(p => p.channel === c.id && !isLinkOnly(p))).filter(Boolean);
   const fold = Object.assign({macro: true, kr: true, us: true}, store.get("fold", {}));
@@ -747,7 +747,31 @@ function secListHtml(tab){
       <div class="hdesc">${esc(desc)}</div></div>`;
   }).join("");
 }
+let DART = null, dartQ = "";
+async function loadDart(){ try{ const r = await fetch("dart.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok){ DART = await r.json(); if(state.win === "pg") render(); } }catch(e){} }
+const DART_TAG = n => /취득신탁/.test(n) ? ["신탁취득","g"] : /소각/.test(n) ? ["소각","g"] : /처분/.test(n) ? ["처분","r"] : /자기주식취득|자기주식 취득/.test(n) ? ["취득","g"]
+  : /유상증자/.test(n) ? ["유상증자","r"] : /전환가액/.test(n) ? ["리픽싱","r"] : /전환사채/.test(n) ? ["CB","r"] : /신주인수권/.test(n) ? ["BW","r"] : /교환사채/.test(n) ? ["EB","r"]
+  : /대량보유/.test(n) ? ["5%보유",""] : /임원/.test(n) ? ["임원·주요주주",""] : /잠정/.test(n) ? ["잠정실적",""] : ["공시",""];
+function dartHtml(cat){
+  if(!DART){ loadDart(); return `<div class="empty">불러오는 중…</div>`; }
+  const q = dartQ.trim().toLowerCase();
+  const xs = DART.items.filter(x => x.cat === cat && (!q || x.corp.toLowerCase().includes(q) || x.code.includes(q)));
+  let last = "", h = `<input id="dartq" value="${esc(dartQ)}" placeholder="종목명 · 코드 검색" style="width:100%;margin:12px 0 4px;padding:11px;border-radius:6px;border:1px solid #333;background:var(--bg);color:var(--ink);font-size:15px">
+    <div class="hdesc" style="margin:4px 0 8px">최근 30일 · ${xs.length}건 · 누르면 DART 원문</div>`;
+  for(const x of xs.slice(0, 300)){
+    const d = x.dt.slice(4,6) + "/" + x.dt.slice(6);
+    if(d !== last){ h += `<div class="sec" style="margin-top:14px">── ${d}</div>`; last = d; }
+    const [tg, c] = DART_TAG(x.nm), col = c === "g" ? "#4ade80" : c === "r" ? "#f87171" : "var(--amber)";
+    h += `<a href="https://m.dart.fss.or.kr/viewer/main.do?rcpNo=${x.rno}" target="_blank" rel="noopener" style="display:block;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none">
+      <div style="font-size:13px"><b>${esc(x.corp)}</b> <span style="color:var(--sub)">${x.code} · ${x.mkt}</span> <span style="color:${col};border:1px solid ${col};border-radius:4px;padding:0 5px;font-size:11.5px;margin-left:4px">${tg}</span></div>
+      <div style="font-size:13px;color:var(--sub);margin-top:3px">${esc(x.nm)}${x.who && x.who !== x.corp ? " · " + esc(x.who) : ""}</div></a>`;
+  }
+  return h + (xs.length ? "" : `<div class="empty">해당 공시가 없습니다.</div>`);
+}
+document.addEventListener("input", e => { if(e.target.id === "dartq"){ dartQ = e.target.value; const p = e.target.selectionStart; render(); const i = $("#dartq"); i.focus(); i.setSelectionRange(p, p); } });
 function pageHtml(){
+  if(["insider","buyback","dilute","earn"].includes(pgId)){ const w = WHEN[pgId] || [];
+    return (w.length ? `<div class="huse" style="margin-top:10px"><b>언제 보나</b>${esc(w[0])}</div><div class="huse"><b>어떻게 읽나</b>${esc(w[1])}</div>` : "") + dartHtml(pgId); }
   const all = HOME_SECTIONS.flatMap(x => x[2]);
   const it = all.find(x => x[0] === pgId) || ["", "", ""];
   const w = WHEN[pgId] || [];
@@ -1055,7 +1079,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795770534";
+const APP_VERSION = "1795771130";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
