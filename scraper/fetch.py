@@ -189,6 +189,40 @@ def _parse_ai_json(s: str) -> dict | None:
     }
 
 
+REVIEW_PROMPT = """아래는 시황 원문과, 그것을 바탕으로 쓴 짧은 코멘트다. 코멘트를 검수해서 고친 코멘트만 출력하라.
+
+검수 기준:
+1. 논리적 비약 제거: "~에도", "~이므로", "따라서", "그래서"로 두 사실을 연결한 줄은 그 이유가 원문에 있는지 확인한다.
+   - 원문에 이유가 있으면 그 이유를 같은 줄에 짧게 넣어 연결을 완성한다 (예: "GDP 강세에도 인상 확률 변화 미미함, 물가 둔화로 인상 명분이 약하기 때문" 처럼 원문 근거로)
+   - 원문에 이유가 없으면 연결어를 빼고 두 사실을 각각 따로 적거나 그 줄을 삭제한다
+2. 앞뒤 줄이 실제로 이어지지 않는데 "따라서"로 시작하면 연결어를 지운다
+3. 원문에 없는 수치·사실은 삭제한다
+4. 형식 유지: 개조식 명사형 종결(~임/~음/~됨/~함), 줄마다 한 논점, 마침표 없음, 이모지 없음, 3~5줄, 마지막 줄은 필요하면 "한줄 요약: ..."
+5. 설명 없이 고친 코멘트 본문만 출력
+
+[원문]
+{text}
+
+[코멘트]
+{take}"""
+
+
+def review_take(text: str, take: str, model: str) -> str | None:
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        return None
+    body = {"contents": [{"parts": [{"text": REVIEW_PROMPT.replace("{text}", text[:6000]).replace("{take}", take)}]}]}
+    try:
+        r = json.loads(http_get(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                                json.dumps(body).encode(), {"Content-Type": "application/json", "x-goog-api-key": key},
+                                timeout=90))
+        out = r["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return out if 10 < len(out) < 900 else None
+    except Exception as e:
+        print(f"[AI] 검수 실패: {e}", file=sys.stderr)
+        return None
+
+
 def ai_comment(post: dict, channel_name: str) -> dict | None:
     provider = (os.environ.get("AI_PROVIDER") or "").lower()
     # Gemini 키만 있으면 자동으로 Gemini 사용 (OpenAI 키가 없을 때)
@@ -244,10 +278,14 @@ def ai_comment(post: dict, channel_name: str) -> dict | None:
         print(f"[AI] {post['uid']} 실패: {e}", file=sys.stderr)
         return None
     parsed = _parse_ai_json(content)
+    if parsed and parsed.get("take") and provider == "gemini":
+        fixed = review_take(post["text"], parsed["take"], model)
+        if fixed:
+            parsed["take"] = fixed
     if parsed:
         parsed["take"] = "\n".join(l.rstrip().rstrip(".").rstrip() for l in parsed.get("take", "").splitlines() if l.strip()
                                    and not l.strip().startswith("시장의 판단"))
-        parsed["tv"] = 2
+        parsed["tv"] = 3
     if parsed and ("핵심 한 줄" in parsed["key"] or len(parsed["key"]) < 12):
         return None
     if parsed:
@@ -299,7 +337,7 @@ def main():
     for p in posts:
         if budget <= 0:
             break
-        if (p.get("ai") and p["ai"].get("take") and p["ai"].get("tv") == 2) or len(p["text"]) < 80 or datetime.fromisoformat(p["date"]) < ai_window:
+        if (p.get("ai") and p["ai"].get("take") and p["ai"].get("tv") == 3) or len(p["text"]) < 80 or datetime.fromisoformat(p["date"]) < ai_window:
             continue
         p["ai"] = ai_comment(p, names.get(p["channel"], p["channel"]))
         budget -= 1

@@ -7,10 +7,10 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="apple-mobile-web-app-title" content="JP View">
+<meta name="apple-mobile-web-app-title" content="JP INVESTMENT">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<title>JP View</title>
+<title>JP INVESTMENT</title>
 <style>
 /* 터미널형: 검정 바탕, 앰버 강조, 상승 빨강/하락 파랑, 고정폭 숫자 */
 :root{
@@ -145,7 +145,7 @@ details.ai summary .hint{color:var(--sub)}
 
 <!-- 잠금 화면 -->
 <section id="lock" class="hidden">
-  <h1>JP View</h1>
+  <h1>JP INVESTMENT</h1>
   <input id="pw" type="password" placeholder="비밀번호" autocomplete="current-password">
   <label><input id="remember" type="checkbox" checked> 이 기기에서 비밀번호 기억</label>
   <button class="btn-primary" id="unlockBtn">열기</button>
@@ -156,7 +156,7 @@ details.ai summary .hint{color:var(--sub)}
 <section id="app">
   <header>
     <div class="top">
-      <div style="display:flex;align-items:center;gap:10px"><button class="icon-btn" id="menuBtn" aria-label="목차">☰</button><h1>JP View</h1></div>
+      <div style="display:flex;align-items:center;gap:10px"><button class="icon-btn" id="menuBtn" aria-label="목차">☰</button><h1>JP INVESTMENT</h1></div>
       <div class="meta">
         <span id="updated">-</span>
         <button class="icon-btn" id="refreshBtn" aria-label="새로고침">🔄</button>
@@ -809,7 +809,7 @@ function buildMenu(){
   const l3 = (act, label, live) => `<button class="l3" data-act="${act}">${esc(label)}${live ? '<span class="live">LIVE</span>' : ""}</button>`;
   const sec = (tab) => { const [id, t, items] = HOME_SECTIONS[SEC_TABS[tab]];
     return `<details><summary class="l1">${esc(t)}</summary>${l3("tab:" + tab, t + " 전체")}${items.map(([iid, nm]) => l3("pg:" + tab + ":" + iid, nm, !!LIVE[iid])).join("")}</details>`; };
-  $("#dnav").innerHTML = `<h3>JP View 목차</h3>
+  $("#dnav").innerHTML = `<h3>JP INVESTMENT 목차</h3>
     <details open><summary class="l1">홈</summary>${l3("home:dash", "대시보드")}${l3("home:watch", "관심 종목 · 스크리너")}${l3("home:latest", "채널별 최신 시황")}</details>
     <details><summary class="l1">텔레그램</summary>${DATA.channels.map(c => l3("ch:" + c.id, c.name)).join("")}</details>
     <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}${l3("rep:local", "국내 리포트")}${l3("rep:foreign", "해외 · 하우스뷰")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>
@@ -896,7 +896,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795763504";
+const APP_VERSION = "1795764013";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
