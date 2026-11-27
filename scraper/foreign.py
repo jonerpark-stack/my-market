@@ -37,7 +37,7 @@ def src_blackrock():
         slug = (d.group(2) or "").replace("-", " ").strip().capitalize()
         out.append({"id": "blk-" + d.group(1), "house": "BlackRock", "series": "Weekly Commentary",
                     "title": slug or "Weekly commentary", "date": f"{d.group(1)[:4]}-{d.group(1)[4:6]}-{d.group(1)[6:]}",
-                    "url": _abs(base, full), "pdf": True})
+                    "url": _abs(base, full), "pdf": True, "page": base})
     return out
 
 
@@ -113,13 +113,23 @@ def summarize(item):
     if not key:
         return None
     parts = [{"text": PROMPT + f"\n\n[출처] {item['house']} · {item['series']} · {item['title']} · {item['date']}"}]
+    data = None
     if item["pdf"]:
-        data, h = _get(item["url"], timeout=90)
-        if len(data) > MAX_PDF_MB * 1024 * 1024:
-            return None
+        for u in (item["url"], item["url"].replace("/gls-download/literature/", "/corporate/literature/")):
+            try:
+                d, h = _get(u, timeout=90)
+            except Exception:
+                continue
+            if d[:5] == b"%PDF-":
+                data = d
+                break
+    if data and len(data) <= MAX_PDF_MB * 1024 * 1024:
         parts.append({"inline_data": {"mime_type": "application/pdf", "data": base64.b64encode(data).decode()}})
-    else:
-        html = _get(item["url"])[0].decode("utf-8", "replace")
+    else:  # PDF를 못 받으면 웹페이지 본문으로 요약
+        page = item.get("page") or (None if item["pdf"] else item["url"])
+        if not page:
+            return None
+        html = _get(page)[0].decode("utf-8", "replace")
         text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", html, flags=re.S)
         text = re.sub(r"<[^>]+>", " ", text)
         parts.append({"text": re.sub(r"\s+", " ", text)[:30000]})
