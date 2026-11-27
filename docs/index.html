@@ -855,7 +855,7 @@ $("#optAi").addEventListener("change", () => { if(sharePost) $("#shareText").val
 $("#sheetClose").addEventListener("click", () => $("#sheet").classList.add("hidden"));
 $("#sheet").addEventListener("click", e => { if(e.target.id === "sheet") $("#sheet").classList.add("hidden"); });
 $("#sheetSend").addEventListener("click", doShare);
-$("#refreshBtn").addEventListener("click", () => refresh(true));
+$("#refreshBtn").addEventListener("click", () => { checkVersion(); refresh(true); });
 $("#settingsBtn").addEventListener("click", () => {
   const v = prompt("강조할 키워드 (쉼표로 구분)\n비우면 기본값 / '로그아웃' 입력 시 비밀번호 삭제", keywords.join(", "));
   if(v === null) return;
@@ -889,7 +889,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795761781";
+const APP_VERSION = "1795761857";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
