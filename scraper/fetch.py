@@ -305,9 +305,9 @@ if __name__ == "__main__":
     main()
     try:
         import importlib.util, pathlib
-        for mod in ("probe",):
+        for mod in ("squeeze",):
             f = pathlib.Path(__file__).with_name(mod + ".py")
             if f.exists():
-                spec = importlib.util.spec_from_file_location(mod, f); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+                spec = importlib.util.spec_from_file_location(mod, f); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); m.run()
     except Exception as e:
         print(f"[EXTRA] 실패: {e}", file=sys.stderr)
