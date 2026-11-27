@@ -21,7 +21,7 @@ def collect(last_id):
     from telethon.sessions import StringSession
     api_id, api_hash, sess = os.environ.get("TG_API_ID"), os.environ.get("TG_API_HASH"), os.environ.get("TG_SESSION")
     if not (api_id and api_hash and sess):
-        print("[DOC] 텔레그램 키 없음 → 건너뜀")
+        print("[DOC] 텔레그램 키 없음 → 건너뜀 (" + ", ".join(f"{k}={'O' if os.environ.get(k) else 'X'}" for k in ("TG_API_ID", "TG_API_HASH", "TG_SESSION", "DART_API_KEY")) + ")")
         return []
     out = []
     with TelegramClient(StringSession(sess), int(api_id), api_hash) as c:
