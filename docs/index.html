@@ -52,6 +52,17 @@ details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:cen
 details.fold>summary::-webkit-details-marker{display:none}
 details.fold .fa{margin-left:auto;color:var(--sub);transition:transform .15s}
 details.fold:not([open]) .fa{transform:rotate(-90deg)}
+.rpsel{width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid #333;border-radius:6px;padding:12px;color:var(--ink);font:700 14px var(--mono)}
+.rplist{border:1px solid #333;border-top:0;border-radius:0 0 6px 6px;max-height:300px;overflow-y:auto}
+.rpopt{display:flex;justify-content:space-between;padding:12px;border-top:1px solid #1d1d1d;font-size:14px;cursor:pointer}
+.rpsub{margin:16px 0 4px;font:800 13px var(--mono);color:var(--amber)}
+.rpi{display:flex;align-items:center;gap:8px;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.rph{font:12px var(--mono);color:var(--amber)}
+.rpt{font-size:14.5px;margin-top:3px;line-height:1.45}
+.rpin{background:#2a2a00;color:#ffd75e;padding:0 4px;border-radius:3px}
+.rpb{flex:none;width:34px;height:34px;border:1px solid #333;border-radius:50%;background:none;color:var(--sub);font-size:16px}
+.rpb.on{color:var(--amber);border-color:#4a3a00}
+.rpb.ck.on{background:var(--ai);border-color:var(--ai);color:#0a0a0a;font-weight:800}
 .sqinfo{margin:12px 0 6px;padding:12px;border:1px solid #333;border-radius:8px;font-size:13.5px;line-height:1.65;color:#cfcfcf}
 .sqinfo>b{display:block;color:var(--amber);font-size:14.5px;margin-bottom:4px}
 .sqband{display:flex;flex-direction:column;gap:3px;margin:8px 0;font-size:12.5px}
@@ -326,6 +337,36 @@ function cardHtml(p){
       <a class="act" href="${esc(p.url)}" target="_blank" rel="noopener">🔗 원문</a>
     </div></article>`;
 }
+let RP = null, rpSector = store.get("rpSector", ""), rpOpen = false;
+const rpRead = new Set(store.get("rpRead", [])), rpSaved = new Set(store.get("rpSaved", []));
+async function loadRP(){
+  try{ const r = await fetch("reports.json?t=" + Date.now(), {cache:"no-store"}); RP = r.ok ? await r.json() : {items:[]}; }catch(e){ RP = {items:[]}; }
+  if(state.tab === "report") render();
+}
+function rpItem(x){
+  const rd = rpRead.has(x.id), sv = rpSaved.has(x.id);
+  const d = x.date ? x.date.slice(5,10).replace("-","/") : "";
+  const tgt = x.indepth ? '<span class="rpin">인뎁스</span>' : x.target ? `<span style="color:var(--ink)">${esc(x.target)}</span>` : '<span style="color:var(--sub)">산업·전략</span>';
+  return `<div class="rpi" data-rp="${x.id}">
+    <div style="flex:1;min-width:0"><div class="rph">${esc(x.broker || "출처 미상")} · ${tgt} · ${d}</div>
+    <div class="rpt">${esc(x.title || x.file || "")}</div></div>
+    <button class="rpb ${sv ? "on" : ""}" data-rpsave="${x.id}" aria-label="저장">${sv ? "★" : "☆"}</button>
+    <button class="rpb ck ${rd ? "on" : ""}" data-rpread="${x.id}" aria-label="읽음">${rd ? "✓" : ""}</button></div>`;
+}
+function krHtml(){
+  if(!RP){ loadRP(); return `<div class="hdesc" style="margin:10px 0">불러오는 중…</div>`; }
+  const items = RP.items || [];
+  if(!items.length) return `<div class="hdesc" style="margin:10px 0">아직 수집된 리포트가 없습니다.</div>`;
+  const cnt = {}, unread = {};
+  items.forEach(x => { const k = x.sector || "기타"; cnt[k] = (cnt[k]||0) + 1; if(!rpRead.has(x.id)) unread[k] = (unread[k]||0) + 1; });
+  const secs = (RP.sectors || []).filter(k => cnt[k]).concat(Object.keys(cnt).filter(k => !(RP.sectors||[]).includes(k)));
+  const saved = items.filter(x => rpSaved.has(x.id));
+  const list = rpSector ? items.filter(x => (x.sector || "기타") === rpSector) : [];
+  return `<div style="margin-top:12px"><button class="rpsel" data-rpsel="1"><span style="${rpSector ? "color:var(--amber)" : ""}">${rpSector ? esc(rpSector) : "‑ 선택 ‑"}</span><span>${rpOpen ? "▴" : "▾"}</span></button>
+    ${rpOpen ? `<div class="rplist">${secs.map(k => `<div class="rpopt" data-rpsec="${esc(k)}"><span>${esc(k)}</span><span style="color:${unread[k] ? "var(--amber)" : "var(--sub)"}">${unread[k] ? "새 " + unread[k] : "✓"} · ${cnt[k]}</span></div>`).join("")}</div>` : ""}</div>
+    ${saved.length ? `<div class="rpsub">★ 저장한 리포트 (${saved.length})</div>${saved.map(rpItem).join("")}` : ""}
+    ${rpSector ? `<div class="rpsub">${esc(rpSector)} · ${list.length}건</div>${list.map(rpItem).join("")}` : `<div class="hdesc" style="margin:12px 0">섹터를 선택하면 리포트가 나옵니다. 누르면 텔레그램에서 PDF가 열립니다.</div>`}`;
+}
 let FR = null;
 async function loadFR(){
   try{ const r = await fetch("foreign.json?t=" + Date.now(), {cache:"no-store"}); if(r.ok) FR = await r.json(); }catch(e){ FR = {items:[]}; }
@@ -345,8 +386,7 @@ function foreignHtml(){
            : `<div class="hdesc" style="margin-top:6px">AI 요약 준비 중</div>`}
       <div class="actions"><a class="act" href="${esc(x.url)}" target="_blank" rel="noopener">${x.pdf ? "📄 원문 PDF" : "🔗 원문"}</a></div></div>`;
   }).join("");
-  const local = `<details class="fold" id="sec-local" data-fold="local" ${fold.local ? "" : "open"}><summary class="sec">── 국내 리포트 <span class="fa">▾</span></summary>
-    <div class="hdesc" style="margin:10px 0">DOC_POOL 채널을 연결하면 증권사 리포트가 섹터별로 정리됩니다.</div></details>`;
+  const local = `<details class="fold" id="sec-local" data-fold="local" ${fold.local ? "" : "open"}><summary class="sec">── 국내 리포트 <span class="fa">▾</span></summary>${krHtml()}</details>`;
   return local + `<details class="fold" id="sec-foreign" data-fold="foreign" ${fold.foreign ? "" : "open"}><summary class="sec">── 해외 · 하우스뷰 <span class="fa">▾</span></summary>
     <div class="hdesc" style="margin:8px 0">블랙록 · JP모건 · 골드만삭스 · 뱅가드 · 연준 공개 리포트를 Gemini가 한국어로 요약합니다.</div>${rows || '<div class="empty">아직 수집된 리포트가 없습니다</div>'}</details>`;
 }
@@ -858,7 +898,7 @@ function buildMenu(){
   $("#dnav").innerHTML = `<h3>JP INVESTMENT 목차</h3>
     <details open><summary class="l1">홈</summary>${l3("home:dash", "대시보드")}${l3("home:watch", "관심 종목 · 스크리너")}${l3("home:latest", "채널별 최신 시황")}</details>
     <details><summary class="l1">텔레그램</summary>${DATA.channels.map(c => l3("ch:" + c.id, c.name)).join("")}</details>
-    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}${l3("rep:local", "국내 리포트")}${l3("rep:foreign", "해외 · 하우스뷰")}<div class="l3" style="color:var(--sub)">섹터 분류 · DOC_POOL 연결 후</div></details>
+    <details><summary class="l1">리포트</summary>${l3("tab:report", "리포트 전체")}${l3("rep:local", "국내 리포트")}${l3("rep:foreign", "해외 · 하우스뷰")}</details>
     ${sec("macro")}${sec("kr")}${sec("us")}`;
 }
 function menu(open){ if(open) buildMenu(); $("#drawer").classList.toggle("hidden", !open); }
@@ -882,6 +922,12 @@ $("#feed").addEventListener("input", e => {
   if(e.target.id === "sqq"){ sqState.q = e.target.value; store.set("sq", sqState); const pos = e.target.selectionStart; render(); const el = $("#sqq"); el.focus(); el.setSelectionRange(pos, pos); }
 });
 $("#feed").addEventListener("click", e => {
+  if(e.target.closest("[data-rpsel]")){ rpOpen = !rpOpen; render(); return; }
+  const rs = e.target.closest("[data-rpsec]"); if(rs){ rpSector = rs.dataset.rpsec; rpOpen = false; store.set("rpSector", rpSector); render(); return; }
+  const sv = e.target.closest("[data-rpsave]"); if(sv){ const id = +sv.dataset.rpsave; rpSaved.has(id) ? rpSaved.delete(id) : rpSaved.add(id); store.set("rpSaved", [...rpSaved]); render(); return; }
+  const ck = e.target.closest("[data-rpread]"); if(ck){ const id = +ck.dataset.rpread; rpRead.has(id) ? rpRead.delete(id) : rpRead.add(id); store.set("rpRead", [...rpRead]); render(); return; }
+  const ri = e.target.closest("[data-rp]");
+  if(ri){ const id = +ri.dataset.rp, x = RP.items.find(y => y.id === id); rpRead.add(id); store.set("rpRead", [...rpRead]); render(); if(x) window.open(x.url, "_blank"); return; }
   const pgb = e.target.closest("[data-pg]");
   if(pgb){ const id = pgb.dataset.pg;
     if(pgb.dataset.ptab){ state.tab = pgb.dataset.ptab; store.set("tab2", state.tab); scrollTo(0,0); }  // 홈에서 누르면 해당 탭으로 이동 후 창 열기
@@ -942,7 +988,7 @@ async function unlock(pw, remember){
 $("#unlockBtn").addEventListener("click", () => unlock($("#pw").value, $("#remember").checked));
 $("#pw").addEventListener("keydown", e => { if(e.key === "Enter") $("#unlockBtn").click(); });
 /* 새 버전 자동 반영: GitHub Pages가 화면 파일을 최대 10분 캐시하므로, 버전이 바뀌면 캐시를 우회해 다시 연다 */
-const APP_VERSION = "1795767066";
+const APP_VERSION = "1795770226";
 async function checkVersion(){
   try{
     const r = await fetch("version.json?t=" + Date.now(), {cache:"no-store"});
