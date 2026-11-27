@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -199,14 +200,26 @@ def ai_comment(post: dict, channel_name: str) -> dict | None:
             key = os.environ.get("GEMINI_API_KEY")
             if not key:
                 return None
-            model = os.environ.get("GEMINI_MODEL") or "gemini-2.0-flash"
+            # 모델이 종료되면 404 → 다음 후보로 자동 전환
+            cands = [m for m in [os.environ.get("GEMINI_MODEL"), "gemini-3.5-flash-lite", "gemini-2.5-flash-lite",
+                                 "gemini-2.5-flash", "gemini-flash-latest"] if m]
             body = {"contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {"responseMimeType": "application/json"}}
-            r = json.loads(http_get(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                json.dumps(body).encode(),
-                {"Content-Type": "application/json", "x-goog-api-key": key}, timeout=90))
-            content = r["candidates"][0]["content"]["parts"][0]["text"]
+            content, last = None, None
+            for model in cands:
+                try:
+                    r = json.loads(http_get(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                        json.dumps(body).encode(),
+                        {"Content-Type": "application/json", "x-goog-api-key": key}, timeout=90))
+                    content = r["candidates"][0]["content"]["parts"][0]["text"]
+                    break
+                except urllib.error.HTTPError as e:
+                    last = e
+                    if e.code != 404:
+                        raise
+            if content is None:
+                raise last or RuntimeError("사용 가능한 Gemini 모델 없음")
         else:
             return None
     except Exception as e:  # 네트워크/한도 오류 → 다음 실행에서 재시도
